@@ -627,6 +627,7 @@ const items=[]; /* предметы на полу (объявлены до де�
 
 /* ---------- ОБСТАНОВКА КОМНАТ ---------- */
 const fountains=[];
+let mopsSpot=null; /* v10: координаты тайной комнаты мопса (спавн — после инициализации player) */
 {
   const stoneM=new THREE.MeshLambertMaterial({color:0x7a7468});
   const woodMat=new THREE.MeshLambertMaterial({color:0x6b4a26});
@@ -743,22 +744,10 @@ const fountains=[];
       fountains.push({x:cx,z:cz,water});
     }
     /* v10: ТАЙНАЯ КОМНАТА МОПСА — шанс 1 к 100 000 на одну комнату.
-       Легендарного мопса больше НЕЛЬЗЯ купить — только так! */
-    if(!player.hasMops&&!window.__mopsPlaced&&Math.random()<0.00001){
-      window.__mopsPlaced=true;
-      const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.68,0.9,10),
-        new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x5a4410,metalness:0.6,roughness:0.4}));
-      ped.position.set(cx,0.45,cz); scene.add(ped);
-      const mm=makeMopsPet(); mm.scale.setScalar(1.15);
-      mm.position.set(cx,0.92,cz); scene.add(mm);
-      /* розовый луч света — видно издалека */
-      const mbeam=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.9,9,12,1,true),
-        new THREE.MeshBasicMaterial({color:0xffb0d0,transparent:true,opacity:0.16,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
-      mbeam.position.set(cx,4.5,cz); scene.add(mbeam);
-      const mgl=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0xffb0d0,transparent:true,opacity:0.6,depthWrite:false,blending:THREE.AdditiveBlending}));
-      mgl.scale.set(3,3,1); mgl.position.set(cx,1.6,cz); scene.add(mgl);
-      scene.add(new THREE.PointLight(0xffb0d0,5,12,2).translateX(cx).translateY(2).translateZ(cz));
-      items.push({mesh:mm,type:'mops'});
+       Легендарного мопса больше НЕЛЬЗЯ купить — только так!
+       Здесь только бросаем жребий (player ещё не существует!) — спавн ниже. */
+    if(!window.__mopsPlaced&&Math.random()<0.00001){
+      window.__mopsPlaced=true; mopsSpot=[cx,cz];
     }
     /* ---------- 15 НОВЫХ ЗАЛОВ (v10) ---------- */
     if(r.type==='throne'){ /* тронный зал: ступени, золотой трон, ковровая дорожка */
@@ -2803,6 +2792,23 @@ let menuActive=true, menuT=0, gt=0;
 loadStep(97,'Пробуждаем замок…'); await tick();
 updateWeaponView();
 loadWallet(); // пильгорцы и покупки возвращаются из прошлого захода (WEAPONS уже объявлены)
+/* v10: спавн ТАЙНОЙ КОМНАТЫ МОПСА (жребий брошен в декоре, player уже существует) */
+if(mopsSpot&&!player.hasMops){
+  const [mx,mz]=mopsSpot;
+  const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.68,0.9,10),
+    new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x5a4410,metalness:0.6,roughness:0.4}));
+  ped.position.set(mx,0.45,mz); scene.add(ped);
+  const mm=makeMopsPet(); mm.scale.setScalar(1.15);
+  mm.position.set(mx,0.92,mz); scene.add(mm);
+  /* розовый луч света — видно издалека */
+  const mbeam=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.9,9,12,1,true),
+    new THREE.MeshBasicMaterial({color:0xffb0d0,transparent:true,opacity:0.16,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending}));
+  mbeam.position.set(mx,4.5,mz); scene.add(mbeam);
+  const mgl=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0xffb0d0,transparent:true,opacity:0.6,depthWrite:false,blending:THREE.AdditiveBlending}));
+  mgl.scale.set(3,3,1); mgl.position.set(mx,1.6,mz); scene.add(mgl);
+  scene.add(new THREE.PointLight(0xffb0d0,5,12,2).translateX(mx).translateY(2).translateZ(mz));
+  items.push({mesh:mm,type:'mops'});
+}
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05,clock.getDelta());
