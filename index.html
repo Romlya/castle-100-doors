@@ -83,9 +83,9 @@
 
 <div id="hud" class="hidden">
   <div id="stats">
-    <div class="barwrap"><div class="bar" id="hpbar" style="width:100%"></div><div class="barlabel">ЗДОРОВЬЕ</div></div>
-    <div class="barwrap"><div class="bar" id="foodbar" style="width:100%"></div><div class="barlabel">СЫТОСТЬ</div></div>
-    <div class="barwrap"><div class="bar" id="waterbar" style="width:100%"></div><div class="barlabel">ВОДА</div></div>
+    <div class="barwrap"><div class="bar" id="hpbar" style="width:100%"></div><div class="barlabel">ЗДОРОВЬЕ <b id="hpnum">100</b></div></div>
+    <div class="barwrap"><div class="bar" id="foodbar" style="width:100%"></div><div class="barlabel">СЫТОСТЬ <b id="foodnum">100</b></div></div>
+    <div class="barwrap"><div class="bar" id="waterbar" style="width:100%"></div><div class="barlabel">ВОДА <b id="waternum">100</b></div></div>
   </div>
   <div id="doorcount">Двери: 0 / 100 • 🪙 0</div>
   <div id="keyicon">🗝 Золотой ключ получен — найди выход!</div>
@@ -132,8 +132,9 @@
      Призраки, рыцари, **пилгоры** и два босса будут мешать, а <b>Каверга</b> будет появляться
      у тебя перед лицом и приказывать: «СТОЯТЬ!», «ПРЫГАТЬ!», «БЕГИ!» — выполняй, иначе получишь пощёчину!
      Многие двери <b>замурованы</b>!<br>
-     Убивай <b>пилгоров</b> — они роняют 🪙 <b>пильгорцы</b>, а за них Мопс и Добрый Пилгор
-     продают еду, аптечки и даже самих себя в помощники (<b>M</b> — магазин, <b>I</b> — инвентарь).</p>
+     Убивай <b>пилгоров</b> — они роняют 🪙 <b>пильгорцы</b> (ещё +1 за каждую дверь), а за них Мопс и Добрый Пилгор
+     продают еду, аптечки, оружие и питомцев (<b>M</b> — магазин, <b>I</b> — инвентарь).
+     <b>Пильгорцы и покупки сохраняются</b> даже после закрытия игры — копи на питомцев!</p>
   <div class="diffrow" id="diffrow">
     <button class="diffbtn" data-d="easy">ЛЁГКИЙ</button>
     <button class="diffbtn sel" data-d="normal">НОРМА</button>
@@ -867,10 +868,10 @@ function placeItems(){
     const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
     if(r.type==='storage')dropAt(cx+0.6,cz+0.6,'food');
     if(r.type==='crypt')dropAt(cx+0.6,cz+0.6,'med');
-    if(r.type==='library')dropCoins(cx+0.6,cz+0.6,2,3);
+    if(r.type==='library')dropCoins(cx+0.6,cz+0.6,3,4);
     if(r.type==='arsenal')dropCoins(cx+0.6,cz+0.6,2,3);
     if(r.type==='chapel')dropAt(cx+0.6,cz+0.6,'water');
-    if(r.type==='treasury')dropCoins(cx+0.6,cz+0.6,4,6);
+    if(r.type==='treasury')dropCoins(cx+0.6,cz+0.6,7,10);
   }
   // аптечки
   for(let i=0;i<8;i++){
@@ -907,8 +908,7 @@ function dropCoins(px,pz,lo,hi){
     c.position.set(px+(Math.random()-0.5)*0.7,0.25,pz+(Math.random()-0.5)*0.7);
     scene.add(c); items.push({mesh:c,type:'coin',val:2});
   }
-}
-placeItems();
+}placeItems();
 loadStep(88,'Выпускаем монстров…'); await tick();
 
 /* ---------- выход ---------- */
@@ -1325,6 +1325,29 @@ function dropLoot(px,pz){
 const player={pos:new THREE.Vector3(wx(1),1.6,wx(1)),yaw:Math.PI*0.75,pitch:0,
   hp:100,food:100,water:100,poison:0,hasKey:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
   coins:0,medkits:0,hasMops:false,hasPilFriend:false,weapon:'blade',weapons:['blade']};
+/* ---------- КОШЕЛЁК: пильгорцы и покупки сохраняются между заходами ---------- */
+const WALLET_KEY='castle100wallet';
+function loadWallet(){
+  try{
+    const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'null');
+    if(!w)return;
+    player.coins=w.coins|0;
+    player.medkits=w.medkits|0;
+    player.hasMops=!!w.hasMops;
+    player.hasPilFriend=!!w.hasPilFriend;
+    if(Array.isArray(w.weapons)&&w.weapons.includes('blade')){
+      player.weapons=[...new Set(['blade',...w.weapons.filter(x=>WEAPONS[x])])];
+    }
+  }catch(e){}
+}
+function saveWallet(){
+  try{
+    localStorage.setItem(WALLET_KEY,JSON.stringify({
+      coins:player.coins,medkits:player.medkits,hasMops:player.hasMops,
+      hasPilFriend:player.hasPilFriend,weapons:player.weapons}));
+  }catch(e){}
+}
+/* loadWallet() вызывается позже — после объявления WEAPONS (см. loadStep 97) */
 torch.position.copy(player.pos);
 
 let spawned=false;
@@ -1519,6 +1542,9 @@ function startRunning(){
   running=true; menuActive=false; manualUnlock=false; $('pauseOv').classList.add('hidden');
   $('hud').classList.remove('hidden');
   spawnAll();
+  /* купленные питомцы возвращаются в каждый новый заход */
+  if(player.hasMops)addCompanion('mops');
+  if(player.hasPilFriend)addCompanion('pil');
   lastSafe.x=player.pos.x; lastSafe.z=player.pos.z; lastSafe.t=elapsed; // точка спавна = безопасная
   if(isTouch){try{const fs=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(fs&&fs.catch)fs.catch(()=>{});}catch(e){}}
   let p;
@@ -1752,14 +1778,14 @@ function killEnemy(en){
     sKey();
     dropLoot(en.mesh.position.x,en.mesh.position.z);
     dropMed(en.mesh.position.x,en.mesh.position.z);
-    dropCoins(en.mesh.position.x,en.mesh.position.z,5,8);
+    dropCoins(en.mesh.position.x,en.mesh.position.z,13,20); // босс: 26-40
   } else if(en.kind==='kaver'){
     msg('👺 Каверга повержена! Обронила аптечку и пильгорцы!','#7ae07a');
     dropMed(en.mesh.position.x,en.mesh.position.z);
-    dropCoins(en.mesh.position.x,en.mesh.position.z,2,4);
+    dropCoins(en.mesh.position.x,en.mesh.position.z,5,8); // пилгор: 10-16 пильгорцев
   } else if(en.kind==='pilgor'){
     msg(en.kind==='ghost'?'Призрак развеян!':'Пилгор-коза повержен! Он обронил пильгорцы! 🪙','#ffd75e');
-    dropCoins(en.mesh.position.x,en.mesh.position.z,2,4);
+    dropCoins(en.mesh.position.x,en.mesh.position.z,4,6); // Каверга: 8-12
   } else {
     msg(en.kind==='ghost'?'Призрак развеян!':'Рыцарь повержен!','#9fd0ff');
   }
@@ -1778,7 +1804,8 @@ addEventListener('keydown',e=>{
       const d=nearDoor;
       d.open=true; d.anim=0.0001;
       openedDoors++; sDoor();
-      msg(`Дверь #${d.num} открыта (${openedDoors}/100)`,'#e8c86a');
+      player.coins++; saveWallet(); // +1 пильгорец за дверь — стабильный доход
+      msg(`Дверь #${d.num} открыта (${openedDoors}/100) 🪙+1`,'#e8c86a');
       if(openedDoors===50)spawnBoss('bossKnight'); // босс на середине пути
       if(d.trap&&!d.triggered){
         if(d.trap==='spike'){ d.spike=makeSpikes(d.gx,d.gy); d.spike.visible=true; }
@@ -1852,8 +1879,8 @@ const SHOP_GOODS=[
   {id:'med',   name:'💊 Аптечка (в сумку)', desc:'лежит в инвентаре, применить когда угодно (+50 HP)', cost:12},
   {id:'axe',   name:'🪓 СЕКИРА', desc:'45 урона! Медленный замах. Сменить оружие — Q', cost:25},
   {id:'spear', name:'🔱 КОПЬЁ', desc:'бьёт на 4.3 м, быстрый укол. Сменить оружие — Q', cost:30},
-  {id:'mops',  name:'🐕 МОПС-КОМПАНЬОН', desc:'бежит за тобой, лает и лечит (+2 ♥ каждые 6 с)', cost:35},
-  {id:'pil',   name:'🐐 ДОБРЫЙ ПИЛГОР', desc:'бежит за тобой и таранит врагов (−20 HP, раз в 6 с)', cost:45},
+  {id:'mops',  name:'🐕 МОПС-КОМПАНЬОН', desc:'бежит за тобой, лает и лечит (+2 ♥ каждые 6 с). Легендарный зверь!', cost:7777},
+  {id:'pil',   name:'🐐 ДОБРЫЙ ПИЛГОР', desc:'таранит врагов (−20 HP, раз в 6 с). Редкий зверь!', cost:1911},
 ];
 function renderShop(){
   $('shopCoins').textContent=player.coins;
@@ -1886,6 +1913,7 @@ function buyGood(id){
   }
   else if(id==='mops'){player.hasMops=true;addCompanion('mops');msg('🐕 МОПС ТЕПЕРЬ ТВОЙ! Он бежит за тобой и лечит лаем!','#ffb0d0');}
   else if(id==='pil'){player.hasPilFriend=true;addCompanion('pil');msg('🐐 ДОБРЫЙ ПИЛГОР ПРИСОЕДИНИЛСЯ! Он таранит твоих врагов!','#7ae07a');}
+  saveWallet();
   renderShop();
 }
 function openShop(){
@@ -1906,10 +1934,10 @@ function renderInv(){
     const act=player.weapon===w;
     return `<div class="goodrow"><div class="gname">${WEAPONS[w].name}<small>${act?'в руках':WEAPONS[w].dmg+' урона • радиус '+WEAPONS[w].range+' м'}</small></div>${act?'<button class="bought">✓ В руках</button>':`<button data-w="${w}">Взять</button>`}</div>`;
   }).join('');
-  const mops=player.hasMops?'<div class="goodrow"><div class="gname">🐕 МОПС — с тобой!<small>лечит +2 ♥ каждые 6 с</small></div><button class="bought">✓</button></div>'
-    :'<div class="goodrow"><div class="gname">🐕 МОПС — ещё не куплен<small>продаётся в лавке (M) за 35 🪙</small></div><button class="cant">🪙 35</button></div>';
-  const pil=player.hasPilFriend?'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — с тобой!<small>таранит врагов −20 HP</small></div><button class="bought">✓</button></div>'
-    :'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — ещё не куплен<small>продаётся в лавке (M) за 45 🪙</small></div><button class="cant">🪙 45</button></div>';
+  const mops=player.hasMops?'<div class="goodrow"><div class="gname">🐕 МОПС — с тобой навсегда!<small>лечит +2 ♥ каждые 6 с (сохраняется между заходами)</small></div><button class="bought">✓</button></div>'
+    :'<div class="goodrow"><div class="gname">🐕 МОПС — легендарный питомец<small>продаётся в лавке (M) за 7777 🪙</small></div><button class="cant">🪙 7777</button></div>';
+  const pil=player.hasPilFriend?'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — с тобой навсегда!<small>таранит врагов −20 HP (сохраняется)</small></div><button class="bought">✓</button></div>'
+    :'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — редкий питомец<small>продаётся в лавке (M) за 1911 🪙</small></div><button class="cant">🪙 1911</button></div>';
   $('invContent').innerHTML=
     `<div class="goodrow"><div class="gname">🪙 Пильгорцы<small>падают из пилгоров, Каверги и боссов</small></div><b style="font-size:18px;color:#ffd75e">${player.coins}</b></div>`+
     `<div class="goodrow"><div class="gname">💊 Аптечки в сумке<small>каждая лечит +50 HP</small></div>${player.medkits>0?`<button id="useMed">Выпить (${player.medkits})</button>`:'<button class="cant">пусто</button>'}</div>`+
@@ -1918,6 +1946,7 @@ function renderInv(){
   if(ub)ub.onclick=()=>{
     if(player.medkits<=0)return;
     player.medkits--; player.hp=Math.min(100,player.hp+50); sPick(); vib(50);
+    saveWallet();
     msg('💉 Аптечка из сумки: +50 здоровья!','#ff7a7a');
     renderInv();
   };
@@ -1948,6 +1977,7 @@ function win(){
 }
 
 let elapsed=0, lastDt=0.016, curMoved=false, curSprint=false, prevSpace=false;
+let walletSaveT=5;
 let curWing=-1, wingMsgCd=0;
 const WING_NAMES=[
   '❄ СЕВЕРО-ЗАПАДНОЕ КРЫЛО — холодный камень',
@@ -2020,6 +2050,8 @@ function updateCompanions(dt){
 }
 function update(dt){
   elapsed+=dt; lastDt=dt;
+  walletSaveT-=dt;
+  if(walletSaveT<=0){walletSaveT=5;saveWallet();} // страховочное автосохранение
   updateCompanions(dt);
 
   /* --- игрок --- */
@@ -2203,7 +2235,7 @@ function update(dt){
       if(it.type==='food'){player.food=Math.min(100,player.food+30);msg('🍞 Хлеб съеден (+30 сытости)','#e0a94b');sPick();}
       else if(it.type==='water'){player.water=Math.min(100,player.water+35);msg('💧 Вода выпита (+35)','#4ba7e0');sPick();}
       else if(it.type==='med'){player.hp=Math.min(100,player.hp+35);msg('💉 Аптечка использована (+35 здоровья)','#ff7a7a');sPick();}
-      else if(it.type==='coin'){player.coins+=it.val;msg(`🪙 +${it.val} пильгорца (всего: ${player.coins})`,'#ffd75e');sPick();}
+      else if(it.type==='coin'){player.coins+=it.val;msg(`🪙 +${it.val} пильгорца (всего: ${player.coins})`,'#ffd75e');sPick();saveWallet();}
       else{player.hasKey=true;sKey();msg('🗝 ЗОЛОТОЙ КЛЮЧ НАЙДЕН! Ищи зелёный луч на юго-востоке замка!','#ffd75e');$('keyicon').style.opacity=1;exitBeam.visible=true;
         exitGate.material=new THREE.MeshLambertMaterial({color:0x143a24,emissive:0x1a8a4a});
         msg('⚡ Из глубин замка раздался рёв... ВЛАДЫКА ЗАМКА охраняет выход!','#e08ae0');
@@ -2391,6 +2423,9 @@ function update(dt){
   $('hpbar').style.width=player.hp+'%';
   $('foodbar').style.width=player.food+'%';
   $('waterbar').style.width=player.water+'%';
+  $('hpnum').textContent=Math.ceil(player.hp);
+  $('foodnum').textContent=Math.ceil(player.food);
+  $('waternum').textContent=Math.ceil(player.water);
   $('doorcount').textContent=`Двери: ${openedDoors} / 100 • 🪙 ${player.coins}`;
   /* сообщение о смене крыла замка (с защитой от спама на границе) */
   if(wingMsgCd>0)wingMsgCd-=dt;
@@ -2423,6 +2458,7 @@ function update(dt){
 let menuActive=true, menuT=0, gt=0;
 loadStep(97,'Пробуждаем замок…'); await tick();
 updateWeaponView();
+loadWallet(); // пильгорцы и покупки возвращаются из прошлого захода (WEAPONS уже объявлены)
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05,clock.getDelta());
