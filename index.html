@@ -41,6 +41,8 @@
   .tbtn.mini{position:absolute;width:48px;height:48px;font-size:20px;}
   #tPause{top:calc(14px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));}
   #tR{top:calc(14px + env(safe-area-inset-top));right:calc(72px + env(safe-area-inset-right));}
+  #tShop{top:calc(84px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));}
+  #tInv{top:calc(84px + env(safe-area-inset-top));right:calc(72px + env(safe-area-inset-right));}
   .tbtn:active{background:rgba(120,90,30,.7);}
   #rotHint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9;display:none;background:rgba(0,0,0,.75);padding:10px 18px;border-radius:10px;border:1px solid #666;font-size:15px;pointer-events:none;}
   @media (orientation:portrait) and (pointer:coarse){#rotHint{display:block;}}
@@ -57,6 +59,13 @@
   .overlay button:hover{background:#9a7422;}
   .diffrow{display:flex;gap:10px;margin-top:14px;}
   .diffbtn{margin:0 !important;font-size:15px !important;padding:9px 22px !important;background:#2a2418 !important;border:1px solid #555 !important;color:#a89a7a !important;}
+  .menubtn{margin-top:10px !important;font-size:16px !important;padding:10px 30px !important;}
+  .goodrow{display:flex;align-items:center;gap:12px;justify-content:space-between;width:min(430px,92vw);background:rgba(30,26,16,.7);border:1px solid #55482a;border-radius:10px;padding:10px 14px;margin:6px 0;}
+  .goodrow .gname{font-size:15px;text-align:left;flex:1;}
+  .goodrow .gname small{display:block;color:#9a8ab0;font-size:12px;}
+  .goodrow button{margin:0 !important;font-size:15px !important;padding:8px 16px !important;background:#2a2418 !important;min-width:96px;}
+  .goodrow button.bought{background:#1a3a1a !important;border-color:#3a8a3a !important;color:#7ae07a !important;}
+  .goodrow button.cant{opacity:.45;}
   .diffbtn.sel{background:#7a5a18 !important;border-color:#caa64a !important;color:#fff !important;}
   #diffdesc{font-size:13px;color:#8f8674;margin-top:8px;}
   .settingsbtn{font-size:15px !important;padding:8px 26px !important;background:#2a2418 !important;border:1px solid #555 !important;color:#a89a7a !important;margin-top:12px !important;}
@@ -78,7 +87,7 @@
     <div class="barwrap"><div class="bar" id="foodbar" style="width:100%"></div><div class="barlabel">СЫТОСТЬ</div></div>
     <div class="barwrap"><div class="bar" id="waterbar" style="width:100%"></div><div class="barlabel">ВОДА</div></div>
   </div>
-  <div id="doorcount">Двери: 0 / 100</div>
+  <div id="doorcount">Двери: 0 / 100 • 🪙 0</div>
   <div id="keyicon">🗝 Золотой ключ получен — найди выход!</div>
   <div id="bossbar" style="display:none">
     <div id="bossname"></div>
@@ -99,6 +108,8 @@
   </div>
   <button class="tbtn mini" id="tPause">⏸</button>
   <button class="tbtn mini" id="tR">🧭</button>
+  <button class="tbtn mini" id="tShop">🛒</button>
+  <button class="tbtn mini" id="tInv">🎒</button>
 </div>
 <div id="vignette"></div>
 <div id="poisveil"></div>
@@ -120,7 +131,9 @@
      и выберись через <b>зелёную выходную дверь</b> в дальнем углу.
      Призраки, рыцари, **пилгоры** и два босса будут мешать, а <b>Каверга</b> будет появляться
      у тебя перед лицом и приказывать: «СТОЯТЬ!», «ПРЫГАТЬ!», «БЕГИ!» — выполняй, иначе получишь пощёчину!
-     Многие двери <b>замурованы</b>!</p>
+     Многие двери <b>замурованы</b>!<br>
+     Убивай <b>пилгоров</b> — они роняют 🪙 <b>пильгорцы</b>, а за них Мопс и Добрый Пилгор
+     продают еду, аптечки и даже самих себя в помощники (<b>M</b> — магазин, <b>I</b> — инвентарь).</p>
   <div class="diffrow" id="diffrow">
     <button class="diffbtn" data-d="easy">ЛЁГКИЙ</button>
     <button class="diffbtn sel" data-d="normal">НОРМА</button>
@@ -140,7 +153,7 @@
   <div class="keys">
     WASD — движение &nbsp;•&nbsp; Мышь — обзор &nbsp;•&nbsp; E — открыть дверь<br>
     ЛКМ — удар мечом &nbsp;•&nbsp; ПРОБЕЛ — прыжок (перепрыгивай шипы!) &nbsp;•&nbsp; Shift — бег<br>
-    Esc/P — пауза &nbsp;•&nbsp; <b>B — захватить/отпустить мышь</b> &nbsp;•&nbsp; <span style="color:#7a7466">без захвата мыши — обзор стрелками ← → ↑ ↓</span><br>
+    Esc/P — пауза &nbsp;•&nbsp; <b>B — захват/отпускание мыши</b> &nbsp;•&nbsp; <b>M — магазин 🛒</b> &nbsp;•&nbsp; <b>I — инвентарь 🎒</b><br>
     <span style="color:#9a8ab0;font-style:italic">...говорят, если закружиться на месте трижды, замок дарит подарок...</span>
   </div>
 </div>
@@ -148,6 +161,20 @@
 <div class="overlay hidden" id="pauseOv">
   <h2>Пауза</h2>
   <p>Кликни, чтобы продолжить (B — отпустить/вернуть мышь)</p>
+</div>
+
+<div class="overlay hidden" id="shopOv">
+  <h2>🛒 ЛАВКА МОПСА И ДОБРОГО ПИЛГОРА</h2>
+  <p style="color:#ffd75e;font-size:16px">🪙 Пилгорцы: <b id="shopCoins">0</b></p>
+  <p style="color:#9a8ab0;font-size:13px">Пилгорцы падают из убитых пилгоров, Каверги и боссов.</p>
+  <div id="shopGoods"></div>
+  <button id="shopClose" class="menubtn">Закрыть (M)</button>
+</div>
+
+<div class="overlay hidden" id="invOv">
+  <h2>🎒 ИНВЕНТАРЬ</h2>
+  <div id="invContent"></div>
+  <button id="invClose" class="menubtn">Закрыть (I)</button>
 </div>
 
 <div class="overlay hidden" id="loadFailOv">
@@ -265,9 +292,9 @@ const openings=[];
 /* ---------- КОМНАТЫ: залы внутри лабиринта ---------- */
 const rooms=[];
 (function makeRooms(){
-  const TYPES=['hall','storage','crypt','fountain'];
+  const TYPES=['hall','storage','crypt','fountain','library','arsenal','chapel','treasury'];
   let tries=0;
-  while(rooms.length<8&&tries<300){
+  while(rooms.length<16&&tries<600){
     tries++;
     const rw=3+((Math.random()*2)|0), rh=3+((Math.random()*2)|0);
     const gx0=1+((Math.random()*(G-2-rw))|0), gy0=1+((Math.random()*(G-2-rh))|0);
@@ -522,8 +549,8 @@ const torchGlowTex=(()=>{
   const winTex=new THREE.CanvasTexture(wc);
   const winGeo=new THREE.PlaneGeometry(0.85,1.5);
   const winMat=new THREE.MeshBasicMaterial({map:winTex});
-  const moonGlow=new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.28,depthWrite:false,blending:THREE.AdditiveBlending,color:0x9ab4f0});
-  const nWin=isTouch?8:14;
+  const moonGlow=new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.42,depthWrite:false,blending:THREE.AdditiveBlending,color:0x9ab4f0});
+  const nWin=isTouch?12:20;
   let placed=0, guard=0;
   while(placed<nWin&&guard++<400){
     const [cx,cy]=floorCells[(Math.random()*floorCells.length)|0];
@@ -540,6 +567,10 @@ const torchGlowTex=(()=>{
     placed++;
   }
 }
+
+/* ---------- ПИЛЬГОРЦЫ: монеты (объявлены ДО декора комнат — там они используются) ---------- */
+const coinGeo=new THREE.CylinderGeometry(0.14,0.14,0.05,14);
+const coinMat=new THREE.MeshStandardMaterial({color:0xffd75e,emissive:0x7a5a10,metalness:0.6,roughness:0.35});
 
 /* ---------- ОБСТАНОВКА КОМНАТ ---------- */
 const fountains=[];
@@ -579,6 +610,76 @@ const fountains=[];
       }
       const sk=new THREE.Mesh(new THREE.SphereGeometry(0.14,6,6),new THREE.MeshLambertMaterial({color:0xd8d2c0}));
       sk.position.set(cx,0.12,cz+0.6); scene.add(sk);
+    }
+    if(r.type==='library'){
+      /* стеллажи с книгами */
+      const shelfG=new THREE.BoxGeometry(0.5,1.9,1.6);
+      const shelfM=new THREE.MeshLambertMaterial({color:0x4a3520});
+      const bookCols=['#8a2020','#20508a','#20783a','#8a7420','#6a2a8a'];
+      for(let s=0;s<4;s++){
+        const ang=s*Math.PI/2, rr=Math.min(r.w,r.h)*S/2-1.4;
+        const bx=cx+Math.cos(ang)*rr, bz=cz+Math.sin(ang)*rr;
+        const sh=new THREE.Mesh(shelfG,shelfM); sh.position.set(bx,0.95,bz); sh.rotation.y=-ang+Math.PI/2; scene.add(sh);
+        for(let b2=0;b2<6;b2++){
+          const bm=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.3,0.22),
+            new THREE.MeshLambertMaterial({color:bookCols[(Math.random()*bookCols.length)|0]}));
+          bm.position.set(bx+Math.cos(ang+Math.PI/2)*(0.5-0.09*b2)+Math.cos(ang)*0.8,0.95+((b2%2)*0.45-0.2),bz+Math.sin(ang+Math.PI/2)*(0.5-0.09*b2)+Math.sin(ang)*0.8);
+          bm.rotation.y=-ang+Math.PI/2; scene.add(bm);
+        }
+      }
+      const lamp=new THREE.PointLight(0xffc060,3,7,2); lamp.position.set(cx,2.2,cz); scene.add(lamp);
+    }
+    if(r.type==='arsenal'){
+      /* стойки с оружием */
+      const rackM=new THREE.MeshLambertMaterial({color:0x3a2c1a});
+      const bladeM=new THREE.MeshLambertMaterial({color:0x9aa2b5});
+      for(let s2=0;s2<3;s2++){
+        const ang=s2*Math.PI*2/3, rr=Math.min(r.w,r.h)*S/2-1.2;
+        const ax=cx+Math.cos(ang)*rr, az=cz+Math.sin(ang)*rr;
+        const rack=new THREE.Mesh(new THREE.BoxGeometry(0.18,1.6,1.2),rackM);
+        rack.position.set(ax,0.8,az); rack.rotation.y=-ang; scene.add(rack);
+        for(let k2=0;k2<3;k2++){
+          const sw=new THREE.Mesh(new THREE.BoxGeometry(0.06,1.0,0.1),bladeM);
+          sw.position.set(ax+Math.cos(ang+Math.PI/2)*(k2-1)*0.3,0.95,az+Math.sin(ang+Math.PI/2)*(k2-1)*0.3);
+          sw.rotation.y=-ang; sw.rotation.z=0.12*(k2-1); scene.add(sw);
+        }
+      }
+      const helm=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8),new THREE.MeshLambertMaterial({color:0x555a6a}));
+      helm.position.set(cx,0.22,cz); helm.scale.y=0.8; scene.add(helm);
+    }
+    if(r.type==='chapel'){
+      /* алтарь со свечами */
+      const altar=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.9,0.8),new THREE.MeshLambertMaterial({color:0x8a8478}));
+      altar.position.set(cx,0.45,cz); scene.add(altar);
+      const cross=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.12),new THREE.MeshLambertMaterial({color:0xcaa64a}));
+      cross.position.set(cx,1.15,cz); scene.add(cross);
+      const cross2=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.12,0.12),cross.material); cross2.position.set(cx,1.28,cz); scene.add(cross2);
+      for(const [sxx,szz] of [[-0.9,-0.4],[0.9,-0.4],[-0.9,0.4],[0.9,0.4]]){
+        const candle=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,0.3,8),new THREE.MeshLambertMaterial({color:0xe8e0d0}));
+        candle.position.set(cx+sxx,0.15,cz+szz); scene.add(candle);
+        const flame=new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6),new THREE.MeshBasicMaterial({color:0xffb040}));
+        flame.position.set(cx+sxx,0.34,cz+szz); scene.add(flame);
+        const cg=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.7,depthWrite:false,blending:THREE.AdditiveBlending}));
+        cg.scale.set(0.7,0.7,1); cg.position.set(cx+sxx,0.38,cz+szz); scene.add(cg);
+      }
+      const cl=new THREE.PointLight(0xffb060,4,9,2); cl.position.set(cx,1.6,cz); scene.add(cl);
+    }
+    if(r.type==='treasury'){
+      /* сундук и горка монет */
+      const chest=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.6,0.7),new THREE.MeshLambertMaterial({color:0x6b4a26}));
+      chest.position.set(cx,0.3,cz); scene.add(chest);
+      const lid=new THREE.Mesh(new THREE.BoxGeometry(1.1,0.18,0.7),new THREE.MeshLambertMaterial({color:0x7a5a2e}));
+      lid.position.set(cx,0.68,cz); scene.add(lid);
+      const band=new THREE.Mesh(new THREE.BoxGeometry(1.14,0.1,0.74),new THREE.MeshLambertMaterial({color:0xcaa64a}));
+      band.position.set(cx,0.52,cz); scene.add(band);
+      for(let m2=0;m2<8;m2++){
+        const cm=new THREE.Mesh(coinGeo,coinMat);
+        cm.rotation.x=Math.PI/2;
+        cm.position.set(cx+(Math.random()-0.5)*1.6,0.05,cz+0.9+(Math.random()-0.5)*1.2);
+        scene.add(cm);
+      }
+      const tg=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.5,depthWrite:false,blending:THREE.AdditiveBlending,color:0xffd75e}));
+      tg.scale.set(2.2,2.2,1); tg.position.set(cx,1.0,cz); scene.add(tg);
     }
     if(r.type==='fountain'){
       const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.55,12),stoneM);
@@ -712,7 +813,7 @@ const fakeDoors=[];
     scene.add(rub);
   }
 }
-loadStep(62,'Вешаем двери с мопсами…'); await tick();
+loadStep(62,'Вешаем двери с мопсами и обставляем 16 залов…'); await tick();
 
 /* ---------- ловушки: визуал ---------- */
 function makeSpikes(gx,gy){
@@ -766,6 +867,10 @@ function placeItems(){
     const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
     if(r.type==='storage')dropAt(cx+0.6,cz+0.6,'food');
     if(r.type==='crypt')dropAt(cx+0.6,cz+0.6,'med');
+    if(r.type==='library')dropCoins(cx+0.6,cz+0.6,2,3);
+    if(r.type==='arsenal')dropCoins(cx+0.6,cz+0.6,2,3);
+    if(r.type==='chapel')dropAt(cx+0.6,cz+0.6,'water');
+    if(r.type==='treasury')dropCoins(cx+0.6,cz+0.6,4,6);
   }
   // аптечки
   for(let i=0;i<8;i++){
@@ -785,12 +890,23 @@ function dropMed(px,pz){
 }
 function dropAt(px,pz,type){
   if(type==='med'){dropMed(px,pz);return;}
+  if(type==='coin'){dropCoins(px,pz,1,4);return;}
   const m=new THREE.Mesh(
     type==='food'?new THREE.CapsuleGeometry(0.14,0.22,4,8):new THREE.CylinderGeometry(0.11,0.11,0.32,10),
     new THREE.MeshLambertMaterial({color:type==='food'?0xb5813f:0x2f9fe0}));
   if(type==='food')m.rotation.z=Math.PI/2;
   m.position.set(px,type==='food'?0.25:0.22,pz);
   scene.add(m); items.push({mesh:m,type});
+}
+/* ---------- ПИЛЬГОРЦЫ: валюта замка ---------- */
+function dropCoins(px,pz,lo,hi){
+  const n=lo+((Math.random()*(hi-lo+1))|0);
+  for(let i=0;i<n;i++){
+    const c=new THREE.Mesh(coinGeo,coinMat);
+    c.rotation.x=Math.PI/2;
+    c.position.set(px+(Math.random()-0.5)*0.7,0.25,pz+(Math.random()-0.5)*0.7);
+    scene.add(c); items.push({mesh:c,type:'coin',val:2});
+  }
 }
 placeItems();
 loadStep(88,'Выпускаем монстров…'); await tick();
@@ -843,11 +959,60 @@ let playerInSafe=false;
   }
 }
 
+/* ---------- ТЕКСТУРЫ ВРАГОВ ---------- */
+function rustTex(){ // ржавая сталь рыцарей
+  const c=document.createElement('canvas');c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#4a4f5e';g.fillRect(0,0,128,128);
+  for(let i=0;i<26;i++){
+    const x=Math.random()*128,y=Math.random()*128,r=3+Math.random()*9;
+    g.fillStyle=Math.random()<0.5?'rgba(122,74,34,0.55)':'rgba(90,58,28,0.45)';
+    g.beginPath();g.ellipse(x,y,r,r*0.7,Math.random()*3,0,7);g.fill();
+  }
+  for(let i=0;i<12;i++){ // царапины
+    g.strokeStyle='rgba(180,186,200,0.35)';g.lineWidth=1;
+    g.beginPath();g.moveTo(Math.random()*128,Math.random()*128);
+    g.lineTo(Math.random()*128,Math.random()*128);g.stroke();
+  }
+  g.fillStyle='rgba(20,20,26,0.35)';
+  for(let i=0;i<5;i++)g.fillRect(0,i*26+22,128,3); // заклёпочные линии
+  return new THREE.CanvasTexture(c);
+}
+function ghostTex(){ // мятые саваны призраков
+  const c=document.createElement('canvas');c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#cfe6ff';g.fillRect(0,0,128,128);
+  for(let i=0;i<18;i++){
+    g.fillStyle=`rgba(${(150+Math.random()*60)|0},${(180+Math.random()*50)|0},255,${0.25+Math.random()*0.3})`;
+    const x=Math.random()*128;
+    g.fillRect(x,0,3+Math.random()*7,128);
+  }
+  for(let i=0;i<10;i++){ // тёмные потёки
+    g.fillStyle='rgba(40,30,70,0.28)';
+    const x=Math.random()*128,y=Math.random()*128;
+    g.fillRect(x,y,4+Math.random()*5,18+Math.random()*30);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function woolTex(){ // кучерявая шерсть козы
+  const c=document.createElement('canvas');c.width=c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#d8d4cc';g.fillRect(0,0,128,128);
+  for(let i=0;i<70;i++){
+    const x=Math.random()*128,y=Math.random()*128,r=2+Math.random()*5;
+    g.fillStyle=`rgba(${(200+Math.random()*40)|0},${(196+Math.random()*40)|0},${(186+Math.random()*40)|0},0.8)`;
+    g.beginPath();g.arc(x,y,r,0,7);g.fill();
+    g.strokeStyle='rgba(120,116,108,0.4)';g.lineWidth=1;
+    g.beginPath();g.arc(x,y,r,0,7);g.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
 /* ================== ВРАГИ ================== */
 function makeGhost(){
   const g=new THREE.Group();
   const body=new THREE.Mesh(new THREE.SphereGeometry(0.45,10,10),
-    new THREE.MeshBasicMaterial({color:0xcfe6ff,transparent:true,opacity:0.55}));
+    new THREE.MeshBasicMaterial({color:0xffffff,map:ghostTex(),transparent:true,opacity:0.6}));
   body.scale.y=1.5;
   const e1=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),new THREE.MeshBasicMaterial({color:0x100c18}));
   const e2=e1.clone();
@@ -856,7 +1021,7 @@ function makeGhost(){
 }
 function makeKnight(){
   const g=new THREE.Group();
-  const steel=new THREE.MeshLambertMaterial({color:0x4a4f5e});
+  const steel=new THREE.MeshLambertMaterial({color:0xffffff,map:rustTex()});
   const dark =new THREE.MeshLambertMaterial({color:0x23252e});
   const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.9,0.45),steel); body.position.y=1.15;
   const helm=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.38,0.42),steel); helm.position.y=1.85;
@@ -901,7 +1066,7 @@ function makeKaver(){
 function makePilgor(){
   /* ПИЛГОР — коза в духе Goat Simulator 3: рога, борода, высунутый язык */
   const g=new THREE.Group();
-  const wool=new THREE.MeshLambertMaterial({color:0xd8d4cc});
+  const wool=new THREE.MeshLambertMaterial({color:0xffffff,map:woolTex()});
   const dark=new THREE.MeshLambertMaterial({color:0x4a4440});
   const hornM=new THREE.MeshLambertMaterial({color:0x9a8a70});
   const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.5,6,10),wool);
@@ -926,7 +1091,46 @@ function makePilgor(){
   g.userData.legs=[l1,l2,l3,l4];
   return g;
 }
-const KAVER_CMDS=[{key:'stand',label:'СТОЯТЬ'},{key:'jump',label:'ПРЫГАТЬ'},{key:'run',label:'БЕГИ'}];const KAVER_TAUNTS=[
+const KAVER_CMDS=[{key:'stand',label:'СТОЯТЬ'},{key:'jump',label:'ПРЫГАТЬ'},{key:'run',label:'БЕГИ'}];
+
+/* ================== КОМПАНЬОНЫ (питомцы из магазина) ================== */
+function makeMopsPet(){
+  const g=new THREE.Group();
+  const fur=new THREE.MeshLambertMaterial({color:0xcfa668});
+  const darkF=new THREE.MeshLambertMaterial({color:0x3a2c20});
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.24,10,8),fur);
+  body.scale.set(1.25,0.9,1); body.position.y=0.24;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.17,10,8),fur); head.position.set(0,0.38,0.3);
+  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,8),darkF); muzzle.position.set(0,0.33,0.42);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(0.03,6,6),new THREE.MeshBasicMaterial({color:0x14100a})); nose.position.set(0,0.35,0.5);
+  const earGeo=new THREE.SphereGeometry(0.07,6,6); earGeo.scale(0.6,1.3,1);
+  const e1=new THREE.Mesh(earGeo,darkF); e1.position.set(-0.11,0.5,0.24);
+  const e2=e1.clone(); e2.position.x=0.11;
+  const eyeM=new THREE.MeshBasicMaterial({color:0x14100a});
+  const ey1=new THREE.Mesh(new THREE.SphereGeometry(0.03,6,6),eyeM); ey1.position.set(-0.07,0.42,0.42);
+  const ey2=ey1.clone(); ey2.position.x=0.07;
+  const tail=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),darkF); tail.position.set(0,0.3,-0.3);
+  const legG=new THREE.BoxGeometry(0.06,0.12,0.06);
+  const l1=new THREE.Mesh(legG,darkF); l1.position.set(-0.12,0.06,0.14);
+  const l2=l1.clone(); l2.position.x=0.12;
+  const l3=l1.clone(); l3.position.z=-0.14;
+  const l4=l3.clone(); l4.position.x=0.12;
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.03,6,14),new THREE.MeshLambertMaterial({color:0xd03030}));
+  collar.position.set(0,0.32,0.26); collar.rotation.x=Math.PI/2;
+  g.add(body,head,muzzle,nose,e1,e2,ey1,ey2,tail,l1,l2,l3,l4,collar);
+  g.userData.legs=[l1,l2,l3,l4];
+  return g;
+}
+function makeKindPilgor(){
+  const g=makePilgor();
+  g.scale.setScalar(0.7);
+  /* добрый пилгор носит зелёный ошейник и у него спокойные глаза */
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.035,6,14),new THREE.MeshLambertMaterial({color:0x2aa04a}));
+  collar.position.set(0,1.0,0.5); collar.rotation.x=Math.PI/2;
+  g.add(collar);
+  return g;
+}
+const KAVER_TAUNTS=[
   '👺 Каверга хихикает где-то в стенах...',
   '👺 Каверга: «Я уже близко-о-о»',
   'Шёпот: «не открывай следующую дверь...»',
@@ -1041,7 +1245,8 @@ function dropLoot(px,pz){
   }
 }
 const player={pos:new THREE.Vector3(wx(1),1.6,wx(1)),yaw:Math.PI*0.75,pitch:0,
-  hp:100,food:100,water:100,poison:0,hasKey:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false};
+  hp:100,food:100,water:100,poison:0,hasKey:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
+  coins:0,medkits:0,hasMops:false,hasPilFriend:false};
 torch.position.copy(player.pos);
 
 let spawned=false;
@@ -1249,6 +1454,12 @@ addEventListener('keydown',e=>{
     running=false; clearKeys(); document.exitPointerLock&&document.exitPointerLock();
     $('pauseOv').classList.remove('hidden');
   }
+  if(e.code==='KeyM'&&!dead&&!won){
+    if(shopOpen)closeShop(); else if(running)openShop();
+  }
+  if(e.code==='KeyI'&&!dead&&!won){
+    if(invOpen)closeInv(); else if(running)openInv();
+  }
 });
 let manualUnlock=false, wasLocked=false;
 document.addEventListener('pointerlockchange',()=>{
@@ -1258,7 +1469,7 @@ document.addEventListener('pointerlockchange',()=>{
   else if(wasLocked){
     wasLocked=false;
     if(!manualUnlock&&running&&!dead&&!won){running=false;$('pauseOv').classList.remove('hidden');}
-    else if(manualUnlock){msg('🖱 Мышь свободна — нажми B, чтобы вернуть захват','#e8c86a');}
+    else if(manualUnlock&&!shopOpen&&!invOpen){msg('🖱 Мышь свободна — нажми B, чтобы вернуть захват','#e8c86a');}
   }
 });
 document.addEventListener('pointerlockerror',()=>{
@@ -1407,20 +1618,27 @@ if(isTouch)document.body.classList.add('touch');
   $('tR').addEventListener('pointerdown',e=>{e.preventDefault();keys['KeyR']=true;});
   $('tR').addEventListener('pointerup',()=>keys['KeyR']=false);
   $('tR').addEventListener('pointercancel',()=>keys['KeyR']=false);
+  $('tShop').addEventListener('pointerdown',e=>{e.preventDefault();if(shopOpen)closeShop();else if(running)openShop();});
+  $('tInv').addEventListener('pointerdown',e=>{e.preventDefault();if(invOpen)closeInv();else if(running)openInv();});
 }
 
 function killEnemy(en){
   en.dead=true; en.deathT=0.8; en.respawnT=en.boss?1e9:en.kind==='kaver'?90:80; sTrap();
   if(en.boss){
-    msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы и аптечку!`,'#7ae07a');
+    msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы, аптечку и горсть пильгорцев!`,'#7ae07a');
     sKey();
     dropLoot(en.mesh.position.x,en.mesh.position.z);
     dropMed(en.mesh.position.x,en.mesh.position.z);
+    dropCoins(en.mesh.position.x,en.mesh.position.z,5,8);
   } else if(en.kind==='kaver'){
-    msg('👺 Каверга повержена! Обронила аптечку!','#7ae07a');
+    msg('👺 Каверга повержена! Обронила аптечку и пильгорцы!','#7ae07a');
     dropMed(en.mesh.position.x,en.mesh.position.z);
+    dropCoins(en.mesh.position.x,en.mesh.position.z,2,4);
+  } else if(en.kind==='pilgor'){
+    msg(en.kind==='ghost'?'Призрак развеян!':'Пилгор-коза повержен! Он обронил пильгорцы! 🪙','#ffd75e');
+    dropCoins(en.mesh.position.x,en.mesh.position.z,2,4);
   } else {
-    msg(en.kind==='ghost'?'Призрак развеян!':en.kind==='pilgor'?'Пилгор-коза повержен!':'Рыцарь повержен!','#9fd0ff');
+    msg(en.kind==='ghost'?'Призрак развеян!':'Рыцарь повержен!','#9fd0ff');
   }
 }
 
@@ -1502,6 +1720,88 @@ function revive(){
   msg('🩸 Ты поднялся у чекпоинта... но замок всё ещё хочет твоей смерти.','#ff9a7a');
 }
 $('reviveBtn').onclick=revive;
+
+/* ================== МАГАЗИН И ИНВЕНТАРЬ ================== */
+let shopOpen=false, invOpen=false;
+const SHOP_GOODS=[
+  {id:'bread', name:'🍞 Хлеб', desc:'+40 сытости сразу', cost:5},
+  {id:'water', name:'💧 Вода', desc:'+45 воды сразу', cost:5},
+  {id:'med',   name:'💊 Аптечка (в сумку)', desc:'лежит в инвентаре, применить когда угодно (+50 HP)', cost:12},
+  {id:'mops',  name:'🐕 МОПС-КОМПАНЬОН', desc:'бежит за тобой, лает и лечит (+2 ♥ каждые 6 с)', cost:35},
+  {id:'pil',   name:'🐐 ДОБРЫЙ ПИЛГОР', desc:'бежит за тобой и таранит врагов (−20 HP, раз в 6 с)', cost:45},
+];
+function renderShop(){
+  $('shopCoins').textContent=player.coins;
+  $('shopGoods').innerHTML=SHOP_GOODS.map(g=>{
+    const owned=(g.id==='mops'&&player.hasMops)||(g.id==='pil'&&player.hasPilFriend);
+    const can=player.coins>=g.cost&&!owned;
+    const btn=owned?'<button class="bought">✓ ТВОЙ</button>'
+      :`<button data-g="${g.id}" class="${can?'':'cant'}">🪙 ${g.cost}</button>`;
+    return `<div class="goodrow"><div class="gname">${g.name}<small>${g.desc}</small></div>${btn}</div>`;
+  }).join('');
+  $('shopGoods').querySelectorAll('button[data-g]').forEach(b=>{
+    b.onclick=()=>buyGood(b.dataset.g);
+  });
+}
+function buyGood(id){
+  const g=SHOP_GOODS.find(x=>x.id===id);
+  if(!g)return;
+  if(id==='mops'&&player.hasMops)return;
+  if(id==='pil'&&player.hasPilFriend)return;
+  if(player.coins<g.cost){msg('🪙 Не хватает пильгорцев! Убивай пилгоров!','#e07a7a');sHurt();return;}
+  player.coins-=g.cost; sKey(); vib(60);
+  if(id==='bread'){player.food=Math.min(100,player.food+40);msg('🍞 Мопс отдал тебе хлеб. Приятного!','#e0a94b');}
+  else if(id==='water'){player.water=Math.min(100,player.water+45);msg('💧 Добрый Пилгор налил тебе воды из фонтана.','#4ba7e0');}
+  else if(id==='med'){player.medkits++;msg('💊 Аптечка убрана в сумку (инвентарь — I).','#ff7a7a');}
+  else if(id==='mops'){player.hasMops=true;addCompanion('mops');msg('🐕 МОПС ТЕПЕРЬ ТВОЙ! Он бежит за тобой и лечит лаем!','#ffb0d0');}
+  else if(id==='pil'){player.hasPilFriend=true;addCompanion('pil');msg('🐐 ДОБРЫЙ ПИЛГОР ПРИСОЕДИНИЛСЯ! Он таранит твоих врагов!','#7ae07a');}
+  renderShop();
+}
+function openShop(){
+  if(dead||won)return;
+  if(invOpen)closeInv(true);
+  shopOpen=true; running=false; manualUnlock=true;
+  document.exitPointerLock&&document.exitPointerLock();
+  renderShop();
+  $('shopOv').classList.remove('hidden');
+}
+function closeShop(resume){
+  shopOpen=false;
+  $('shopOv').classList.add('hidden');
+  if(resume!==false&&!dead&&!won)startRunning();
+}
+function renderInv(){
+  const mops=player.hasMops?'<div class="goodrow"><div class="gname">🐕 МОПС — с тобой!<small>лечит +2 ♥ каждые 6 с</small></div><button class="bought">✓</button></div>'
+    :'<div class="goodrow"><div class="gname">🐕 МОПС — ещё не куплен<small>продаётся в лавке (M) за 35 🪙</small></div><button class="cant">🪙 35</button></div>';
+  const pil=player.hasPilFriend?'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — с тобой!<small>таранит врагов −20 HP</small></div><button class="bought">✓</button></div>'
+    :'<div class="goodrow"><div class="gname">🐐 ДОБРЫЙ ПИЛГОР — ещё не куплен<small>продаётся в лавке (M) за 45 🪙</small></div><button class="cant">🪙 45</button></div>';
+  $('invContent').innerHTML=
+    `<div class="goodrow"><div class="gname">🪙 Пильгорцы<small>падают из пилгоров, Каверги и боссов</small></div><b style="font-size:18px;color:#ffd75e">${player.coins}</b></div>`+
+    `<div class="goodrow"><div class="gname">💊 Аптечки в сумке<small>каждая лечит +50 HP</small></div>${player.medkits>0?`<button id="useMed">Выпить (${player.medkits})</button>`:'<button class="cant">пусто</button>'}</div>`+
+    mops+pil;
+  const ub=document.getElementById('useMed');
+  if(ub)ub.onclick=()=>{
+    if(player.medkits<=0)return;
+    player.medkits--; player.hp=Math.min(100,player.hp+50); sPick(); vib(50);
+    msg('💉 Аптечка из сумки: +50 здоровья!','#ff7a7a');
+    renderInv();
+  };
+}
+function openInv(){
+  if(dead||won)return;
+  if(shopOpen)closeShop(true);
+  invOpen=true; running=false; manualUnlock=true;
+  document.exitPointerLock&&document.exitPointerLock();
+  renderInv();
+  $('invOv').classList.remove('hidden');
+}
+function closeInv(resume){
+  invOpen=false;
+  $('invOv').classList.add('hidden');
+  if(resume!==false&&!dead&&!won)startRunning();
+}
+$('shopClose').onclick=()=>closeShop();
+$('invClose').onclick=()=>closeInv();
 function win(){
   won=true; running=false;
   document.exitPointerLock();
@@ -1518,8 +1818,71 @@ const WING_NAMES=[
   '🩸 ЮГО-ВОСТОЧНОЕ КРЫЛО — здесь где-то выход',
 ];
 const tmpV=new THREE.Vector3(); // переиспользуемый вектор — без аллокаций в кадре
+/* ================== ОБНОВЛЕНИЕ КОМПАНЬОНОВ ================== */
+const companions=[]; // {mesh, kind:'mops'|'pil', barkT, hitT, msgT}
+function addCompanion(kind){
+  if(companions.some(c=>c.kind===kind))return;
+  const mesh=kind==='mops'?makeMopsPet():makeKindPilgor();
+  mesh.position.copy(player.pos); mesh.position.y=0;
+  scene.add(mesh);
+  companions.push({mesh,kind,barkT:2,side:kind==='mops'?1:-1});
+}
+function updateCompanions(dt){
+  /* целевая точка: сбоку-сзади от игрока (правый борт — мопс, левый — пилгор-друг) */
+  const fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);
+  const rx=Math.cos(player.yaw), rz=-Math.sin(player.yaw);
+  for(let i=0;i<companions.length;i++){
+    const c=companions[i];
+    const back=i===0?1.0:1.5, side=c.side*0.8;
+    const tx=player.pos.x-fx*back+rx*side, tz=player.pos.z-fz*back+rz*side;
+    const k=Math.min(1,dt*4.5);
+    const ox=c.mesh.position.x, oz=c.mesh.position.z;
+    c.mesh.position.x+=(tx-ox)*k;
+    c.mesh.position.z+=(tz-oz)*k;
+    /* поворот по движению */
+    const mvx=c.mesh.position.x-ox, mvz=c.mesh.position.z-oz;
+    if(Math.abs(mvx)+Math.abs(mvz)>1e-4)c.mesh.rotation.y=Math.atan2(mvx,mvz);
+    /* шаг лапками */
+    const legs=c.mesh.userData&&c.mesh.userData.legs;
+    const spd=Math.hypot(mvx,mvz)/Math.max(dt,1e-4);
+    if(legs){const sw=Math.min(1,spd/3)*0.7;
+      for(let j=0;j<legs.length;j++)legs[j].rotation.x=Math.sin(elapsed*10+j*Math.PI/2)*sw;}
+    c.mesh.position.y=Math.abs(Math.sin(elapsed*9))*0.02*Math.min(1,spd/3);
+    if(c.kind==='mops'){
+      c.barkT-=dt;
+      if(c.barkT<=0){
+        c.barkT=6;
+        beep(420,300,0.08,'square',0.14); setTimeout(()=>beep(380,260,0.1,'square',0.12),90);
+        if(player.hp<100){player.hp=Math.min(100,player.hp+2);}
+      }
+    }else{
+      c.barkT-=dt;
+      if(c.barkT<=0){
+        /* добрый пилгор таранит ближайшего врага */
+        let best=null,bd=6.5*6.5;
+        for(const en of enemies){
+          if(en.dead)continue;
+          if(en.kind==='kaver'&&en.state!=='haunt')continue;
+          const d2=(en.mesh.position.x-c.mesh.position.x)**2+(en.mesh.position.z-c.mesh.position.z)**2;
+          if(d2<bd){bd=d2;best=en;}
+        }
+        if(best){
+          c.barkT=6;
+          beep(300,240,0.15,'sawtooth',0.18);
+          best.hp-=20; sHit();
+          const dx=best.mesh.position.x-player.pos.x, dz=best.mesh.position.z-player.pos.z;
+          const dl=Math.max(0.01,Math.hypot(dx,dz));
+          moveWithCollision(best.mesh.position,0.45,dx/dl*1.4,dz/dl*1.4,true,best.boss,best.kind==='ghost');
+          msg('🐐 Добрый Пилгор врезался во врага! (−20 HP)','#7ae07a');
+          if(best.hp<=0)killEnemy(best);
+        }else c.barkT=1.5;
+      }
+    }
+  }
+}
 function update(dt){
   elapsed+=dt; lastDt=dt;
+  updateCompanions(dt);
 
   /* --- игрок --- */
   if(keys['ArrowLeft'])player.yaw+=2.4*dt;
@@ -1701,6 +2064,7 @@ function update(dt){
       if(it.type==='food'){player.food=Math.min(100,player.food+40);msg('🍞 Хлеб съеден (+40 сытости)','#e0a94b');sPick();}
       else if(it.type==='water'){player.water=Math.min(100,player.water+45);msg('💧 Вода выпита (+45)','#4ba7e0');sPick();}
       else if(it.type==='med'){player.hp=Math.min(100,player.hp+35);msg('💉 Аптечка использована (+35 здоровья)','#ff7a7a');sPick();}
+      else if(it.type==='coin'){player.coins+=it.val;msg(`🪙 +${it.val} пильгорца (всего: ${player.coins})`,'#ffd75e');sPick();}
       else{player.hasKey=true;sKey();msg('🗝 ЗОЛОТОЙ КЛЮЧ НАЙДЕН! Ищи зелёный луч на юго-востоке замка!','#ffd75e');$('keyicon').style.opacity=1;exitBeam.visible=true;
         exitGate.material=new THREE.MeshLambertMaterial({color:0x143a24,emissive:0x1a8a4a});
         msg('⚡ Из глубин замка раздался рёв... ВЛАДЫКА ЗАМКА охраняет выход!','#e08ae0');
@@ -1888,7 +2252,7 @@ function update(dt){
   $('hpbar').style.width=player.hp+'%';
   $('foodbar').style.width=player.food+'%';
   $('waterbar').style.width=player.water+'%';
-  $('doorcount').textContent=`Двери: ${openedDoors} / 100`;
+  $('doorcount').textContent=`Двери: ${openedDoors} / 100 • 🪙 ${player.coins}`;
   /* сообщение о смене крыла замка (с защитой от спама на границе) */
   if(wingMsgCd>0)wingMsgCd-=dt;
   {
