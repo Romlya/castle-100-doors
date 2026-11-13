@@ -104,7 +104,16 @@
 <div id="poisveil"></div>
 <div id="rotHint">↻ Поверни телефон горизонтально — так удобнее</div>
 
-<div class="overlay" id="startOv">
+<div class="overlay" id="loadOv">
+  <h1>🏰 ЗАМОК 100 ДВЕРЕЙ</h1>
+  <p id="loadTxt">Пробуждаем замок…</p>
+  <div style="width:280px;height:12px;border:1px solid #8a744a;border-radius:6px;margin:14px auto;background:rgba(0,0,0,.5)">
+    <div id="loadBar" style="height:100%;width:5%;border-radius:5px;background:linear-gradient(90deg,#7a5a1e,#e8c86a);transition:width .3s"></div>
+  </div>
+  <p style="color:#7a7466;font-size:13px">камни • двери • мопсы • монстры</p>
+</div>
+
+<div class="overlay hidden" id="startOv">
   <h1>🏰 ЗАМОК 100 ДВЕРЕЙ</h1>
   <p>Ты заперт в древнем замке. За 100 дверями скрываются ловушки, еда, вода и смерть.
      Найди <b>хлеб</b>, <b>фляги с водой</b> и <b>аптечки</b>, отыщи <b>золотой ключ</b>
@@ -143,7 +152,10 @@
 
 <div class="overlay hidden" id="loadFailOv">
   <h2>⛔ Замок не открылся</h2>
-  <p>Не удалось загрузить 3D-движок — проверь интернет.<br>Обычно помогает перезагрузка страницы.</p>
+  <p id="failTxt" style="color:#e8a86a">Не удалось загрузить игру.</p>
+  <p id="gpuHelp" style="display:none;text-align:left;font-size:14px">Похоже, браузеру недоступна 3D-графика (WebGL). Помогает одно из:<br>
+  💻 <b>Компьютер:</b> настройки браузера → Система → включить <b>«Использовать аппаратное ускорение»</b> → перезапустить браузер.<br>
+  📱 <b>Телефон:</b> обнови браузер (Chrome/Safari) и перезагрузи страницу.</p>
   <button onclick="location.replace(location.pathname+'?r='+Date.now())">🔄 ПЕРЕЗАГРУЗИТЬ</button>
 </div>
 
@@ -156,9 +168,21 @@
   window.__gameLoaded=false; window.__pendingStart=false;
   window.__markLoaded=function(){
     if(window.__gameLoaded)return; window.__gameLoaded=true;
-    var b=document.getElementById('startBtn');
-    if(b)b.textContent='ВОЙТИ В ЗАМОК';
+    var l=document.getElementById('loadOv'), s=document.getElementById('startOv');
+    if(l)l.classList.add('hidden');
+    if(s)s.classList.remove('hidden');
   };
+  window.__showFail=function(why){
+    var f=document.getElementById('loadFailOv'), t=document.getElementById('failTxt');
+    var l=document.getElementById('loadOv');
+    if(l)l.classList.add('hidden');
+    if(t&&why)t.textContent=String(why).slice(0,220);
+    if(f)f.classList.remove('hidden');
+  };
+  /* любая ошибка — сразу на экран (иначе телефон молча зависает и баг неопознаваем) */
+  addEventListener('error',function(ev){
+    window.__showFail('Ошибка: '+(ev.message||ev.type)+' ('+((ev.filename||'').split('/').pop()||'?')+':'+(ev.lineno||'?')+')');
+  });
   var btn=document.getElementById('startBtn');
   if(btn)btn.addEventListener('click',function(){
     if(!window.__gameLoaded){
@@ -168,11 +192,8 @@
   },true);
   setTimeout(function(){
     if(window.__gameLoaded)return;
-    var f=document.getElementById('loadFailOv');
-    var b=document.getElementById('startBtn');
-    if(b)b.textContent='ОБНОВИ СТРАНИЦУ (F5)';
-    if(f)f.classList.remove('hidden');
-  },12000);
+    window.__showFail('Замок не пробудился за 20 секунд — проверь интернет и перезагрузи страницу.');
+  },20000);
 })();
 </script>
 
@@ -210,6 +231,11 @@ let THREE=null;
     throw new Error('Не удалось загрузить Three.js ни с одного CDN');
   }
 }
+
+/* ПРОГРЕСС ЗАГРУЗКИ */
+const loadStep=(pct,txt)=>{ const b=document.getElementById('loadBar'),s=document.getElementById('loadTxt'); if(b)b.style.width=pct+'%'; if(s&&txt)s.textContent=txt; };
+const tick=()=>new Promise(r=>{ requestAnimationFrame(r); setTimeout(r,120); });
+loadStep(8,'Грузим движок…');
 
 /* ================== БАЗА ================== */
 const L=15, G=L*2+1, S=3.2, WALL_H=3.6, OR=-G*S/2;
@@ -373,9 +399,26 @@ const doorMatGold  =new THREE.MeshLambertMaterial({map:woodTex(),color:0xd8b050}
 
 /* ================== СЦЕНА ================== */
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-const renderer=new THREE.WebGLRenderer({antialias:true});
+let renderer=null, webglBroken=false;
+try{
+  renderer=new THREE.WebGLRenderer({antialias:!isTouch});
+}catch(e1){
+  try{
+    renderer=new THREE.WebGLRenderer({antialias:false,failIfMajorPerformanceCaveat:false,powerPreference:'low-power'});
+  }catch(e2){ renderer=null; }
+}
+if(!renderer){
+  webglBroken=true;
+  window.__showFail('Браузер не смог создать 3D-контекст (WebGL).');
+  const gh=document.getElementById('gpuHelp'); if(gh)gh.style.display='block';
+  throw new Error('WebGL недоступен');
+}
+const webglLost=e=>{ e.preventDefault(); msg('⚠ Графика перезагружается — секунду…','#e8c86a'); };
+renderer.domElement.addEventListener('webglcontextlost',webglLost);
 renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,isTouch?1.5:2)); // на телефонах ниже — иначе лаги
+/* лёгкая графика по умолчанию на телефоне (если пользователь ещё не выбирал) */
+if(isTouch&&localStorage.getItem('castle100set')===null)settings.lightGfx=true;
+renderer.setPixelRatio(settings.lightGfx&&isTouch?1:Math.min(devicePixelRatio,isTouch?1.5:2)); // на телефонах ниже — иначе лаги
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.1;
 document.getElementById('game').appendChild(renderer.domElement);
@@ -449,7 +492,7 @@ const torchGlowTex=(()=>{
   const fGeo=new THREE.BoxGeometry(0.1,0.3,0.1);
   const fMat=new THREE.MeshLambertMaterial({color:0x3a2c1a});
   const glowMat=new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.8,depthWrite:false,blending:THREE.AdditiveBlending});
-  const n=40;
+  const n=isTouch&&settings.lightGfx?18:40;
   for(let i=0;i<n;i++){
     const [cx,cy]=floorCells[(Math.random()*floorCells.length)|0];
     const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>grid[cy+dy]&&grid[cy+dy][cx+dx]===1);
@@ -459,6 +502,42 @@ const torchGlowTex=(()=>{
     const br=new THREE.Mesh(fGeo,fMat); br.position.set(px,1.6,pz); scene.add(br);
     const fl=new THREE.Mesh(tGeo,tMat); fl.position.set(px,1.95,pz); scene.add(fl);
     const glow=new THREE.Sprite(glowMat); glow.scale.set(1.7,1.7,1); glow.position.set(px,2.05,pz); scene.add(glow);
+  }
+}
+
+/* ---------- ОКНА: готические окна с лунным светом ---------- */
+{
+  const wc=document.createElement('canvas'); wc.width=64; wc.height=96;
+  const w=wc.getContext('2d');
+  w.fillStyle='#4a4540'; w.fillRect(0,0,64,96);                       // каменная рама
+  const gl=w.createLinearGradient(0,14,0,88);
+  gl.addColorStop(0,'#c8d4f0'); gl.addColorStop(0.55,'#8a9cc8'); gl.addColorStop(1,'#4a5a8a');
+  w.fillStyle=gl;
+  w.beginPath();                                                       // стрельчатое окно
+  w.moveTo(12,88); w.lineTo(12,40); w.quadraticCurveTo(32,8,52,40); w.lineTo(52,88); w.closePath(); w.fill();
+  w.strokeStyle='#3a3630'; w.lineWidth=4;
+  w.beginPath(); w.moveTo(32,14); w.lineTo(32,88); w.stroke();         // средник
+  w.beginPath(); w.moveTo(12,52); w.lineTo(52,52); w.stroke();         // перекладина
+  w.strokeRect(6,6,52,84);
+  const winTex=new THREE.CanvasTexture(wc);
+  const winGeo=new THREE.PlaneGeometry(0.85,1.5);
+  const winMat=new THREE.MeshBasicMaterial({map:winTex});
+  const moonGlow=new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.28,depthWrite:false,blending:THREE.AdditiveBlending,color:0x9ab4f0});
+  const nWin=isTouch?8:14;
+  let placed=0, guard=0;
+  while(placed<nWin&&guard++<400){
+    const [cx,cy]=floorCells[(Math.random()*floorCells.length)|0];
+    const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>grid[cy+dy]&&grid[cy+dy][cx+dx]===1);
+    if(!dirs.length)continue;
+    const [dx,dy]=dirs[(Math.random()*dirs.length)|0];
+    const px=wx(cx)+dx*(S/2+0.06), pz=wx(cy)+dy*(S/2+0.06);
+    const win=new THREE.Mesh(winGeo,winMat);
+    win.position.set(px,1.85,pz);
+    win.rotation.y=Math.atan2(-dx,-dy);
+    scene.add(win);
+    const glow=new THREE.Sprite(moonGlow); glow.scale.set(1.5,2.1,1); glow.position.set(px-dx*0.15,1.9,pz-dy*0.15);
+    scene.add(glow);
+    placed++;
   }
 }
 
@@ -518,6 +597,7 @@ const shuffleOpen=shuffle(openings.slice());
 const inRoom=(x,y)=>rooms.some(r=>x>=r.x0&&x<r.x0+r.w&&y>=r.y0&&y<r.y0+r.h);
 const roomFree=shuffleOpen.filter(([x,y])=>!inRoom(x,y));
 const doorDefs=(roomFree.length>=100?roomFree:shuffleOpen).slice(0,100);
+loadStep(28,'Строим лабиринт…'); await tick();
 
 function plaqueTex(n,reward){
   const c=document.createElement('canvas'); c.width=c.height=96;
@@ -613,7 +693,7 @@ const fakeDoors=[];
   mgr.addColorStop(0,'rgba(60,110,40,0.7)'); mgr.addColorStop(1,'rgba(60,110,40,0)');
   mg.fillStyle=mgr; mg.fillRect(0,0,64,64);
   const mossTex=new THREE.CanvasTexture(mossC);
-  for(let i=0;i<26;i++){
+  for(let i=0;i<(isTouch&&settings.lightGfx?12:26);i++){
     const [x,y]=floorCells[(Math.random()*floorCells.length)|0];
     const m=new THREE.Mesh(new THREE.PlaneGeometry(1.2+Math.random(),1.2+Math.random()),
       new THREE.MeshBasicMaterial({map:mossTex,transparent:true,depthWrite:false}));
@@ -632,6 +712,7 @@ const fakeDoors=[];
     scene.add(rub);
   }
 }
+loadStep(62,'Вешаем двери с мопсами…'); await tick();
 
 /* ---------- ловушки: визуал ---------- */
 function makeSpikes(gx,gy){
@@ -712,6 +793,7 @@ function dropAt(px,pz,type){
   scene.add(m); items.push({mesh:m,type});
 }
 placeItems();
+loadStep(88,'Выпускаем монстров…'); await tick();
 
 /* ---------- выход ---------- */
 const EXIT=[G-2,G-2]; // клетка (29,29)
@@ -1836,6 +1918,7 @@ function update(dt){
 }
 
 let menuActive=true, menuT=0, gt=0;
+loadStep(97,'Пробуждаем замок…'); await tick();
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05,clock.getDelta());
@@ -1869,6 +1952,7 @@ window.__game={get running(){return running},set running(v){running=v},
   get wx(){return wx},get OR(){return OR},get S(){return S},get G(){return G},
   get exitPos(){return exitPos},get hasKey(){return player.hasKey}};
 window.__markLoaded&&window.__markLoaded();
+loadStep(100,'Замок готов!');
 /* пользователь кликнул раньше, чем загрузился движок — входим сами */
 if(window.__pendingStart&&!running){ setTimeout(()=>{ const b=document.getElementById('startBtn'); if(b&&$('startOv').classList.contains('hidden')===false)b.click(); },60); }
 
