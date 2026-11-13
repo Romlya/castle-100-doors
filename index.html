@@ -1635,6 +1635,7 @@ function loadWallet(){
     player.hasPilFriend=!!w.hasPilFriend;
     if(Array.isArray(w.weapons)&&w.weapons.includes('blade')){
       player.weapons=[...new Set(['blade',...w.weapons.filter(x=>WEAPONS[x])])];
+      if(w.weapon&&WEAPONS[w.weapon]&&player.weapons.includes(w.weapon))player.weapon=w.weapon;
     }
   }catch(e){}
 }
@@ -1642,7 +1643,7 @@ function saveWallet(){
   try{
     localStorage.setItem(WALLET_KEY,JSON.stringify({
       coins:player.coins,medkits:player.medkits,hasMops:player.hasMops,
-      hasPilFriend:player.hasPilFriend,weapons:player.weapons}));
+      hasPilFriend:player.hasPilFriend,weapons:player.weapons,weapon:player.weapon}));
   }catch(e){}
 }
 /* loadWallet() вызывается позже — после объявления WEAPONS (см. loadStep 97) */
@@ -2202,7 +2203,7 @@ function renderShop(){
 function buyGood(id){
   const g=SHOP_GOODS.find(x=>x.id===id);
   if(!g)return;
-  if(id==='mops'&&player.hasMops)return;
+  if(id==='mops')return; // v10: мопс больше не продаётся — только тайная комната (1 к 100 000)
   if(id==='pil'&&player.hasPilFriend)return;
   if((id==='axe'||id==='spear')&&player.weapons.includes(id))return;
   if(player.coins<g.cost){msg('🪙 Не хватает пильгорцев! Убивай пилгоров!','#e07a7a');sHurt();return;}
@@ -2214,7 +2215,6 @@ function buyGood(id){
     player.weapons.push(id); setWeapon(id);
     msg(`${WEAPONS[id].name} куплена и в руках! Сменить — Q или 1/2/3`,'#e8c86a');
   }
-  else if(id==='mops'){player.hasMops=true;addCompanion('mops');msg('🐕 МОПС ТЕПЕРЬ ТВОЙ! Он бежит за тобой и лечит лаем!','#ffb0d0');}
   else if(id==='pil'){player.hasPilFriend=true;addCompanion('pil');msg('🐐 ДОБРЫЙ ПИЛГОР ПРИСОЕДИНИЛСЯ! Он таранит твоих врагов!','#7ae07a');}
   saveWallet();
   renderShop();
@@ -2532,7 +2532,7 @@ function update(dt){
     if(dist<ndF){ndF=dist;nFake=f;}
   }
   if(!nearDoor&&nFake)nearDoor=nFake;
-  if(nearDoor){prompt.style.display='block';prompt.textContent=`${isTouch?'🚪':'E'} — открыть дверь #${nearDoor.num}${(!nearDoor.fake&&nearDoor.warn)?' (на двери следы крови!)':''}`;}
+  if(nearDoor){prompt.style.display='block';prompt.textContent=`${isTouch?'🚪':'E'} — ${(nearDoor.fake||nearDoor.num!==openedDoors+1)?'🔒':'открыть'} дверь #${nearDoor.num}${(!nearDoor.fake&&nearDoor.warn)?' (на двери следы крови!)':''}`;}
   else prompt.style.display='none';
 
   /* --- предметы --- */
