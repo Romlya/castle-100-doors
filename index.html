@@ -140,6 +140,7 @@
   <h2>☠ Ты мёртв</h2>
   <p id="deathMsg"></p>
   <p id="deathStats"></p>
+  <button id="reviveBtn" style="display:none">⚔ ПОДНЯТЬСЯ (чекпоинт)</button>
   <button onclick="location.reload()">Попробовать снова</button>
 </div>
 
@@ -250,6 +251,7 @@ function woodTex(){
 }
 const doorMatNormal=new THREE.MeshLambertMaterial({map:woodTex()});
 const doorMatBlood =new THREE.MeshLambertMaterial({map:woodTex(),color:0xb07060});
+const doorMatGold  =new THREE.MeshLambertMaterial({map:woodTex(),color:0xd8b050}); // тайники за каждой 10-й
 
 /* ================== СЦЕНА ================== */
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -284,6 +286,18 @@ const walls=new THREE.InstancedMesh(wallGeo,wallMat,wallCount);
   }
 }
 scene.add(walls);
+/* крылья замка: каждая четверть лабиринта со своим оттенком камня */
+{
+  const c=new THREE.Color(); let wi=0;
+  for(let y=0;y<G;y++)for(let x=0;x<G;x++)if(grid[y][x]===1){
+    if(x<G/2&&y<G/2)c.setRGB(0.82,0.88,1.08);      // СЗ — холодный камень
+    else if(x>=G/2&&y<G/2)c.setRGB(0.8,1.08,0.9);  // СВ — сырые зеленоватые стены
+    else if(x<G/2&&y>=G/2)c.setRGB(1.1,0.95,0.78); // ЮЗ — тёплые залы
+    else c.setRGB(1.12,0.82,0.78);                 // ЮВ — багровое крыло выхода
+    walls.setColorAt(wi++,c);
+  }
+  walls.instanceColor.needsUpdate=true;
+}
 
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(G*S,G*S),new THREE.MeshLambertMaterial({map:stoneFloorTex()}));
 floor.rotation.x=-Math.PI/2; scene.add(floor);
@@ -321,13 +335,14 @@ const doorAt=new Map();               // "x_y" -> door
 const shuffleOpen=shuffle(openings.slice());
 const doorDefs=shuffleOpen.slice(0,100);
 
-function plaqueTex(n){
+function plaqueTex(n,reward){
   const c=document.createElement('canvas'); c.width=c.height=96;
   const g=c.getContext('2d');
   g.fillStyle='#241a10'; g.fillRect(0,0,96,96);
-  g.strokeStyle='#c9a44a'; g.lineWidth=6; g.strokeRect(5,5,86,86);
+  g.strokeStyle=reward?'#ffd75e':'#c9a44a'; g.lineWidth=reward?8:6; g.strokeRect(5,5,86,86);
   g.fillStyle='#e8cf8a'; g.font='bold 40px Georgia'; g.textAlign='center'; g.textBaseline='middle';
-  g.fillText(n,48,52);
+  g.fillText(n,48,46);
+  if(reward){ g.fillStyle='#ffd75e'; g.font='24px Georgia'; g.fillText('★',48,76); }
   return new THREE.CanvasTexture(c);
 }
 
@@ -335,14 +350,15 @@ const doors=[];
 doorDefs.forEach(([gx,gy],idx)=>{
   const num=idx+1;
   const alongX=grid[gy][gx-1]===0; // проход вдоль x -> дверь перекрывает z
+  const reward=num%10===0;        // каждая 10-я дверь — тайник со звездой на табличке
   const trapped=Math.random()<0.45;
   const trap=trapped?(r=>r<0.4?'spike':r<0.7?'darts':'gas')(Math.random()):null;
   const bloodTrim=trapped&&Math.random()<0.5;
 
-  const mat=bloodTrim?doorMatBlood:doorMatNormal;
+  const mat=reward?doorMatGold:(bloodTrim?doorMatBlood:doorMatNormal);
   const slab=new THREE.Mesh(new THREE.BoxGeometry(alongX?0.22:S*0.92, 3.3, alongX?S*0.92:0.22), mat);
   const plaque=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.6),
-    new THREE.MeshBasicMaterial({map:plaqueTex(num),side:THREE.DoubleSide}));
+    new THREE.MeshBasicMaterial({map:plaqueTex(num,reward),side:THREE.DoubleSide}));
   const plaque2=plaque.clone();
   if(alongX){ plaque.position.set(0.13,1.4,0);  plaque.rotation.y=Math.PI/2;
               plaque2.position.set(-0.13,1.4,0); plaque2.rotation.y=-Math.PI/2; }
@@ -355,7 +371,7 @@ doorDefs.forEach(([gx,gy],idx)=>{
   else{ pivot.position.set(wx(gx)-S*0.46,0,wx(gy)); slab.position.set(S*0.46,1.65,0); }
   pivot.add(slab); scene.add(pivot);
 
-  const d={gx,gy,num,alongX,pivot,slab,trap,warn:bloodTrim,triggered:false,open:false,anim:0,
+  const d={gx,gy,num,alongX,pivot,slab,trap,warn:bloodTrim,triggered:false,open:false,anim:0,reward,
            spike:null,gas:null,bolt:null,hurtT:0};
   doors.push(d); doorAt.set(gx+'_'+gy,d);
 });
@@ -453,6 +469,15 @@ function dropMed(px,pz){
   gm.add(box,c1,c2); gm.position.set(px,0.3,pz);
   scene.add(gm); items.push({mesh:gm,type:'med'});
 }
+function dropAt(px,pz,type){
+  if(type==='med'){dropMed(px,pz);return;}
+  const m=new THREE.Mesh(
+    type==='food'?new THREE.CapsuleGeometry(0.14,0.22,4,8):new THREE.CylinderGeometry(0.11,0.11,0.32,10),
+    new THREE.MeshLambertMaterial({color:type==='food'?0xb5813f:0x2f9fe0}));
+  if(type==='food')m.rotation.z=Math.PI/2;
+  m.position.set(px,type==='food'?0.25:0.22,pz);
+  scene.add(m); items.push({mesh:m,type});
+}
 placeItems();
 
 /* ---------- выход ---------- */
@@ -526,7 +551,9 @@ function makeKnight(){
   const legR=legL.clone(); legR.position.x=0.18;
   const arm=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.6,0.16),steel); arm.position.set(0.45,1.2,0.1); arm.rotation.z=-0.5;
   const sword=new THREE.Mesh(new THREE.BoxGeometry(0.07,1.1,0.12),new THREE.MeshLambertMaterial({color:0x9aa2b5})); sword.position.set(0.62,1.3,0.25); sword.rotation.z=-0.9;
-  g.add(body,helm,visor,plume,legL,legR,arm,sword); return g;
+  g.add(body,helm,visor,plume,legL,legR,arm,sword);
+  g.userData.legs=[legL,legR]; // для анимации шага
+  return g;
 }
 
 const enemies=[];
@@ -812,7 +839,7 @@ addEventListener('keyup',e=>keys[e.code]=false);
    и стирание «зажатых» клавиш ощущалось как софтлок (игра перестаёт слушаться).
    Залипание маловероятно: keyup почти всегда доходит. Полная очистка — при скрытии вкладки и паузе. */
 document.addEventListener('visibilitychange',clearKeys);
-let locked=false, running=false, dead=false, won=false;
+let locked=false, running=false, dead=false, won=false, revivesUsed=0;
 
 $('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); startRunning(); };
 $('pauseOv').onclick=()=>startRunning();
@@ -1007,6 +1034,15 @@ addEventListener('keydown',e=>{
         if(d.trap==='spike'){ d.spike=makeSpikes(d.gx,d.gy); d.spike.visible=true; }
         if(d.trap==='gas'){ d.gas=makeGas(d.gx,d.gy); }
       }
+      if(d.reward){
+        /* тайник за дверью: на дальней от игрока стороне проёма */
+        const bx=d.alongX?(player.pos.x<wx(d.gx)?1:-1):(player.pos.z<wx(d.gy)?1:-1);
+        const rx=d.alongX?wx(d.gx)+bx*0.95:wx(d.gx)+0.45;
+        const rz=d.alongX?wx(d.gy)+0.45:wx(d.gy)+bx*0.95;
+        if(Math.random()<0.55)dropAt(rx,rz,'med'); else {dropAt(rx-0.3,rz+0.2,'food');dropAt(rx+0.3,rz-0.2,'water');}
+        sKey();
+        msg(`✨ За дверью #${d.num} — тайник! Ты слышал звон?`,'#ffd75e');
+      }
     }
   }
 });
@@ -1030,8 +1066,33 @@ function die(why){
   document.exitPointerLock();
   $('deathMsg').textContent=why;
   $('deathStats').textContent=`Открыто дверей: ${openedDoors}/100. Продержался ${Math.floor(elapsed)} c.`;
+  /* чекпоинт: за каждые 25 открытых дверей — одно возрождение */
+  const n=Math.max(0,Math.floor(openedDoors/25)-revivesUsed);
+  $('reviveBtn').style.display=n>0?'':'none';
+  $('reviveBtn').textContent=`⚔ ПОДНЯТЬСЯ (${n}) — вернуться в замок`;
   $('deathOv').classList.remove('hidden');
 }
+function revive(){
+  revivesUsed++;
+  dead=false; player.poison=0;
+  player.hp=55;
+  player.food=Math.max(player.food,40); player.water=Math.max(player.water,40);
+  /* возвращаем к спавну или к ближайшей безопасной зоне */
+  let bx=wx(1),bz=wx(1);
+  for(const z of safeZones){
+    if(Math.hypot(z.pos.x-player.pos.x,z.pos.z-player.pos.z)<40){bx=z.pos.x;bz=z.pos.z;break;}
+  }
+  player.pos.x=bx; player.pos.z=bz; player.pos.y=1.6; player.vy=0; player.safeT=0; player.warnedSafe=false;
+  for(const en of enemies){ // отодвинуть врагов от места возрождения
+    if(en.dead)continue;
+    const d2=(en.mesh.position.x-bx)**2+(en.mesh.position.z-bz)**2;
+    if(d2<100)en.cd=Math.max(en.cd,2);
+  }
+  $('deathOv').classList.add('hidden');
+  startRunning();
+  msg('🩸 Ты поднялся у чекпоинта... но замок всё ещё хочет твоей смерти.','#ff9a7a');
+}
+$('reviveBtn').onclick=revive;
 function win(){
   won=true; running=false;
   document.exitPointerLock();
@@ -1040,6 +1101,13 @@ function win(){
 }
 
 let elapsed=0, lastDt=0.016, curMoved=false, curSprint=false, prevSpace=false;
+let curWing=-1, wingMsgCd=0;
+const WING_NAMES=[
+  '❄ СЕВЕРО-ЗАПАДНОЕ КРЫЛО — холодный камень',
+  '🌫 СЕВЕРО-ВОСТОЧНОЕ КРЫЛО — сырые стены, пахнет плесенью',
+  '🕯 ЮГО-ЗАПАДНОЕ КРЫЛО — тёплые факельные залы',
+  '🩸 ЮГО-ВОСТОЧНОЕ КРЫЛО — здесь где-то выход',
+];
 const tmpV=new THREE.Vector3(); // переиспользуемый вектор — без аллокаций в кадре
 function update(dt){
   elapsed+=dt; lastDt=dt;
@@ -1282,6 +1350,14 @@ function update(dt){
       if(best){en.mesh.position.x=best[0];en.mesh.position.z=best[1];}
     }
     if(Math.abs(en.mesh.position.x-oldx)<Math.abs(vx*dt)*0.5&&Math.abs(en.mesh.position.z-oldz)<Math.abs(vz*dt)*0.5&&en.state==='wander')en.wt=0;
+    /* анимация шага рыцарей: ноги переставляются по реальной скорости */
+    const legs=en.mesh.userData&&en.mesh.userData.legs;
+    if(legs){
+      const v=Math.hypot(en.mesh.position.x-oldx,en.mesh.position.z-oldz)/Math.max(dt,1e-4);
+      const sw=Math.min(1,v/3)*0.6;
+      legs[0].rotation.x=Math.sin(en.t*10)*sw;
+      legs[1].rotation.x=-Math.sin(en.t*10)*sw;
+    }
     en.mesh.position.y=(en.kind==='ghost'?1.5+Math.sin(en.t*2.5)*0.15:0);
   }
 
@@ -1324,6 +1400,12 @@ function update(dt){
   $('foodbar').style.width=player.food+'%';
   $('waterbar').style.width=player.water+'%';
   $('doorcount').textContent=`Двери: ${openedDoors} / 100`;
+  /* сообщение о смене крыла замка (с защитой от спама на границе) */
+  if(wingMsgCd>0)wingMsgCd-=dt;
+  {
+    const w=(player.pos.z<0?0:2)+(player.pos.x<0?0:1);
+    if(w!==curWing&&wingMsgCd<=0){curWing=w;wingMsgCd=20;msg(WING_NAMES[w],'#c8b890');}
+  }
   /* компас: после ключа указывает на выход (стрелка крутится поyaw) */
   const cp=$('compass');
   if(player.hasKey&&!dead&&!won){
@@ -1370,7 +1452,7 @@ loop();
 window.__game={get running(){return running},set running(v){running=v},
   get hasAudio(){return !!AC},
   get player(){return player},get enemies(){return enemies},get doors(){return doors},
-  get openedDoors(){return openedDoors},get items(){return items},get dead(){return dead},get won(){return won},
+  get openedDoors(){return openedDoors},set openedDoors(v){openedDoors=v},get items(){return items},get dead(){return dead},get won(){return won},
   get keys(){return keys},get nearDoor(){return nearDoor},get fakeDoors(){return fakeDoors},
   spawnBoss, get diff(){return diff}, get safeZones(){return safeZones},
   get playerInSafe(){return playerInSafe},
