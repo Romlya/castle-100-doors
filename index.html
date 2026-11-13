@@ -971,10 +971,36 @@ let mopsSpot=null; /* v10: координаты тайной комнаты мо
   }
 }
 const doorAt=new Map();               // "x_y" -> door
-const shuffleOpen=shuffle(openings.slice());
 const inRoom=(x,y)=>rooms.some(r=>x>=r.x0&&x<r.x0+r.w&&y>=r.y0&&y<r.y0+r.h);
-const roomFree=shuffleOpen.filter(([x,y])=>!inRoom(x,y));
-const doorDefs=(roomFree.length>=100?roomFree:shuffleOpen).slice(0,100);
+/* v10.1: ДВЕРИ В ПРАВИЛЬНОМ ПОРЯДКЕ — №1 у самого старта, №100 у выхода.
+   Сортируем проёмы по реальной дистанции ходьбы (BFS от спавна по коридорам),
+   а не по прямой — порядок прохождения совпадает с пути игрока */
+const roomFree=openings.filter(([x,y])=>!inRoom(x,y));
+{
+  const dist=Array.from({length:G},()=>Array(G).fill(-1));
+  const q=[[1,1]]; dist[1][1]=0;
+  for(let qi=0;qi<q.length;qi++){
+    const [cx,cy]=q[qi];
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=cx+dx,ny=cy+dy;
+      if(nx<0||ny<0||nx>=G||ny>=G)continue;
+      if(grid[ny][nx]!==0||dist[ny][nx]!==-1)continue;
+      dist[ny][nx]=dist[cy][cx]+1; q.push([nx,ny]);
+    }
+  }
+  const dOf=([x,y])=>{
+    let best=1e9;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx=x+dx,ny=y+dy;
+      if(nx>=0&&ny>=0&&nx<G&&ny<G&&grid[ny][nx]===0&&dist[ny][nx]>=0)best=Math.min(best,dist[ny][nx]);
+    }
+    return best;
+  };
+  const cand=roomFree.length>=100?roomFree:openings.filter(([x,y])=>!inRoom(x,y));
+  cand.sort((a,b)=>dOf(a)-dOf(b));
+  roomFree.length=0; roomFree.push(...cand);
+}
+const doorDefs=roomFree.slice(0,100);
 loadStep(28,'Строим лабиринт…'); await tick();
 
 function plaqueTex(n,reward){
