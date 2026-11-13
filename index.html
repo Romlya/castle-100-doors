@@ -131,15 +131,50 @@
   <div class="keys">
     WASD — движение &nbsp;•&nbsp; Мышь — обзор &nbsp;•&nbsp; E — открыть дверь<br>
     ЛКМ — удар мечом &nbsp;•&nbsp; ПРОБЕЛ — прыжок (перепрыгивай шипы!) &nbsp;•&nbsp; Shift — бег<br>
-    Esc/P — пауза &nbsp;•&nbsp; <span style="color:#7a7466">без захвата мыши — обзор стрелками ← → ↑ ↓</span><br>
+    Esc/P — пауза &nbsp;•&nbsp; <b>B — захватить/отпустить мышь</b> &nbsp;•&nbsp; <span style="color:#7a7466">без захвата мыши — обзор стрелками ← → ↑ ↓</span><br>
     <span style="color:#9a8ab0;font-style:italic">...говорят, если закружиться на месте трижды, замок дарит подарок...</span>
   </div>
 </div>
 
 <div class="overlay hidden" id="pauseOv">
   <h2>Пауза</h2>
-  <p>Кликни, чтобы продолжить</p>
+  <p>Кликни, чтобы продолжить (B — отпустить/вернуть мышь)</p>
 </div>
+
+<div class="overlay hidden" id="loadFailOv">
+  <h2>⛔ Замок не открылся</h2>
+  <p>Не удалось загрузить 3D-движок — проверь интернет.<br>Обычно помогает перезагрузка страницы.</p>
+  <button onclick="location.replace(location.pathname+'?r='+Date.now())">🔄 ПЕРЕЗАГРУЗИТЬ</button>
+</div>
+
+<script>
+/* СТОРОЖ ЗАГРУЗКИ: модуль игры вешает обработчик кнопки в самом конце,
+   а движок едет с CDN. Пока не загрузился — клики молча терялись («не заходит в игру»).
+   Теперь: ранний клик запоминается → после загрузки авто-вход; если движок
+   не приехал за 12 с — показываем понятное сообщение. */
+(function(){
+  window.__gameLoaded=false; window.__pendingStart=false;
+  window.__markLoaded=function(){
+    if(window.__gameLoaded)return; window.__gameLoaded=true;
+    var b=document.getElementById('startBtn');
+    if(b)b.textContent='ВОЙТИ В ЗАМОК';
+  };
+  var btn=document.getElementById('startBtn');
+  if(btn)btn.addEventListener('click',function(){
+    if(!window.__gameLoaded){
+      window.__pendingStart=true;
+      btn.textContent='ЗАГРУЗКА… ОДНА СЕКУНДА';
+    }
+  },true);
+  setTimeout(function(){
+    if(window.__gameLoaded)return;
+    var f=document.getElementById('loadFailOv');
+    var b=document.getElementById('startBtn');
+    if(b)b.textContent='ОБНОВИ СТРАНИЦУ (F5)';
+    if(f)f.classList.remove('hidden');
+  },12000);
+})();
+</script>
 
 <div class="overlay hidden" id="deathOv">
   <h2>☠ Ты мёртв</h2>
@@ -159,7 +194,22 @@
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
 </script>
 <script type="module">
-import * as THREE from 'three';
+/* ЗАГРУЗКА ДВИЖКА С РЕЗЕРВОМ: если jsdelivr отвечает 502/не отвечает — берём с unpkg */
+let THREE=null;
+{
+  const CDNS=[
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+    'https://unpkg.com/three@0.160.0/build/three.module.js'
+  ];
+  for(const u of CDNS){
+    try{ THREE=await import(u); break; }catch(e){}
+  }
+  if(!THREE){
+    const f=document.getElementById('loadFailOv');
+    if(f)f.classList.remove('hidden');
+    throw new Error('Не удалось загрузить Three.js ни с одного CDN');
+  }
+}
 
 /* ================== БАЗА ================== */
 const L=15, G=L*2+1, S=3.2, WALL_H=3.6, OR=-G*S/2;
@@ -1101,7 +1151,7 @@ let locked=false, running=false, dead=false, won=false, revivesUsed=0;
 $('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); startRunning(); };
 $('pauseOv').onclick=()=>startRunning();
 function startRunning(){
-  running=true; menuActive=false; $('pauseOv').classList.add('hidden');
+  running=true; menuActive=false; manualUnlock=false; $('pauseOv').classList.add('hidden');
   $('hud').classList.remove('hidden');
   spawnAll();
   lastSafe.x=player.pos.x; lastSafe.z=player.pos.z; lastSafe.t=elapsed; // точка спавна = безопасная
@@ -1109,7 +1159,7 @@ function startRunning(){
   let p;
   try{ p=renderer.domElement.requestPointerLock(); }catch(e){ p=null; }
   if(p&&p.catch)p.catch(()=>{
-    msg('Захват мыши недоступен здесь — поворачивай стрелками ← → ↑ ↓',' #e8c86a');
+    msg('Захват мыши недоступен — поворачивай стрелками ← → ↑ ↓, захват вернёт клавиша B','#e8c86a');
   });
 }
 addEventListener('keydown',e=>{
@@ -1118,12 +1168,31 @@ addEventListener('keydown',e=>{
     $('pauseOv').classList.remove('hidden');
   }
 });
-let wasLocked=false;
+let manualUnlock=false, wasLocked=false;
 document.addEventListener('pointerlockchange',()=>{
   locked=document.pointerLockElement===renderer.domElement;
   clearKeys();
-  if(locked){wasLocked=true;running=true;$('pauseOv').classList.add('hidden');}
-  else if(wasLocked&&running&&!dead&&!won){wasLocked=false;running=false;$('pauseOv').classList.remove('hidden');}
+  if(locked){wasLocked=true;manualUnlock=false;running=true;$('pauseOv').classList.add('hidden');}
+  else if(wasLocked){
+    wasLocked=false;
+    if(!manualUnlock&&running&&!dead&&!won){running=false;$('pauseOv').classList.remove('hidden');}
+    else if(manualUnlock){msg('🖱 Мышь свободна — нажми B, чтобы вернуть захват','#e8c86a');}
+  }
+});
+document.addEventListener('pointerlockerror',()=>{
+  if(!isTouch)msg('Захват мыши не удался — подожди секунду и нажми B','#e8c86a');
+});
+addEventListener('keydown',e=>{
+  /* B — вручную захватить/отпустить мышь (без паузы) */
+  if(e.code==='KeyB'&&running&&!dead&&!won){
+    if(locked){
+      manualUnlock=true;
+      document.exitPointerLock&&document.exitPointerLock();
+    }else{
+      manualUnlock=false;
+      try{ const p=renderer.domElement.requestPointerLock(); if(p&&p.catch)p.catch(()=>{}); }catch(err){}
+    }
+  }
 });
 addEventListener('mousemove',e=>{
   if(!running||dead||won||menuActive)return;
@@ -1799,6 +1868,9 @@ window.__game={get running(){return running},set running(v){running=v},
   get solid(){return solid},get circleHits(){return circleHits},
   get wx(){return wx},get OR(){return OR},get S(){return S},get G(){return G},
   get exitPos(){return exitPos},get hasKey(){return player.hasKey}};
+window.__markLoaded&&window.__markLoaded();
+/* пользователь кликнул раньше, чем загрузился движок — входим сами */
+if(window.__pendingStart&&!running){ setTimeout(()=>{ const b=document.getElementById('startBtn'); if(b&&$('startOv').classList.contains('hidden')===false)b.click(); },60); }
 
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
