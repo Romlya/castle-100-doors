@@ -996,7 +996,7 @@ const roomFree=openings.filter(([x,y])=>!inRoom(x,y));
     }
     return best;
   };
-  const cand=roomFree.length>=100?roomFree:openings.filter(([x,y])=>!inRoom(x,y));
+  const cand=(roomFree.length>=100?roomFree:openings.filter(([x,y])=>!inRoom(x,y))).slice(); /* КОПИЯ! */
   cand.sort((a,b)=>dOf(a)-dOf(b));
   roomFree.length=0; roomFree.push(...cand);
 }
