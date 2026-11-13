@@ -2,14 +2,15 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Замок 100 дверей — выживание</title>
 <style>
   html,body{margin:0;padding:0;overflow:hidden;background:#000;font-family:'Segoe UI',Arial,sans-serif;color:#e8e0d0;}
   #game{position:fixed;inset:0;}
-  canvas{display:block;}
+  canvas{display:block;touch-action:none;}
   /* ---------- HUD ---------- */
   #hud{position:fixed;inset:0;pointer-events:none;z-index:5;}
-  #stats{position:absolute;top:14px;left:14px;width:230px;}
+  #stats{position:absolute;top:calc(14px + env(safe-area-inset-top));left:calc(14px + env(safe-area-inset-left));width:230px;}
   .barwrap{width:100%;height:14px;background:rgba(0,0,0,.55);border:1px solid #555;border-radius:4px;margin-bottom:5px;position:relative;}
   .bar{height:100%;border-radius:3px;transition:width .2s;}
   .barlabel{position:absolute;left:6px;top:-1px;font-size:10px;line-height:14px;text-shadow:0 0 3px #000;letter-spacing:1px;}
@@ -26,7 +27,7 @@
   @keyframes blink{from{opacity:1}to{opacity:.55}}
   #crosshair{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#fff;border-radius:50%;opacity:.8;box-shadow:0 0 4px #000;}
   #prompt{position:absolute;bottom:110px;left:50%;transform:translateX(-50%);font-size:16px;text-shadow:0 0 4px #000;background:rgba(0,0,0,.5);padding:6px 16px;border-radius:6px;display:none;border:1px solid #666;}
-  #log{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:520px;text-align:center;font-size:14px;}
+  #log{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:520px;max-width:92vw;text-align:center;font-size:14px;}
   /* ===== ТАЧ-УПРАВЛЕНИЕ (только на сенсорных) ===== */
   #touchui{display:none;}
   body.touch #touchui{display:block;}
@@ -34,13 +35,15 @@
   #joyzone{position:absolute;left:0;top:0;bottom:0;width:46%;}
   #joybase{position:absolute;width:120px;height:120px;border-radius:50%;border:2px solid rgba(200,180,120,.5);background:rgba(30,24,14,.35);display:none;}
   #joyknob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border-radius:50%;background:rgba(202,166,74,.55);border:2px solid #caa64a;}
-  #tbtns{position:absolute;right:16px;bottom:20px;display:flex;gap:14px;align-items:flex-end;}
+  #tbtns{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;gap:14px;align-items:flex-end;}
   .tbtn{width:64px;height:64px;border-radius:50%;border:2px solid #8a744a;background:rgba(40,32,18,.55);color:#e8d9a8;font-size:26px;display:flex;align-items:center;justify-content:center;}
   .tbtn.big{width:84px;height:84px;font-size:36px;}
   .tbtn.mini{position:absolute;width:48px;height:48px;font-size:20px;}
-  #tPause{top:14px;right:14px;}
-  #tR{top:14px;right:72px;}
+  #tPause{top:calc(14px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));}
+  #tR{top:calc(14px + env(safe-area-inset-top));right:calc(72px + env(safe-area-inset-right));}
   .tbtn:active{background:rgba(120,90,30,.7);}
+  #rotHint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9;display:none;background:rgba(0,0,0,.75);padding:10px 18px;border-radius:10px;border:1px solid #666;font-size:15px;pointer-events:none;}
+  @media (orientation:portrait) and (pointer:coarse){#rotHint{display:block;}}
   .msg{margin:3px 0;padding:4px 10px;background:rgba(0,0,0,.55);border-radius:5px;animation:fadein .3s;}
   @keyframes fadein{from{opacity:0;transform:translateY(8px);}to{opacity:1;}}
   #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;background:radial-gradient(ellipse at center, transparent 55%, rgba(120,0,0,.55) 100%);opacity:0;transition:opacity .25s;}
@@ -99,13 +102,14 @@
 </div>
 <div id="vignette"></div>
 <div id="poisveil"></div>
+<div id="rotHint">↻ Поверни телефон горизонтально — так удобнее</div>
 
 <div class="overlay" id="startOv">
   <h1>🏰 ЗАМОК 100 ДВЕРЕЙ</h1>
   <p>Ты заперт в древнем замке. За 100 дверями скрываются ловушки, еда, вода и смерть.
      Найди <b>хлеб</b>, <b>фляги с водой</b> и <b>аптечки</b>, отыщи <b>золотой ключ</b>
      и выберись через <b>зелёную выходную дверь</b> в дальнем углу.
-     Призраки, рыцари и два босса будут мешать, а <b>Каверга</b> будет появляться
+     Призраки, рыцари, **пилгоры** и два босса будут мешать, а <b>Каверга</b> будет появляться
      у тебя перед лицом и приказывать: «СТОЯТЬ!», «ПРЫГАТЬ!», «БЕГИ!» — выполняй, иначе получишь пощёчину!
      Многие двери <b>замурованы</b>!</p>
   <div class="diffrow" id="diffrow">
@@ -113,7 +117,7 @@
     <button class="diffbtn sel" data-d="normal">НОРМА</button>
     <button class="diffbtn" data-d="hard">КОШМАР</button>
   </div>
-  <div id="diffdesc">Враги: 8 призраков и 6 рыцарей • ловушки ×1.0</div>
+  <div id="diffdesc">Враги: 8 призраков, 6 рыцарей и 3 пилгора • урон снижен на треть</div>
   <button id="settingsBtn" class="settingsbtn">⚙ НАСТРОЙКИ</button>
   <div id="settingsBox" class="hidden">
     <label>🖱 Чувствительность мыши: <b id="sensval">1.0</b>
@@ -178,6 +182,69 @@ const openings=[];
     grid[2*ny+1][2*nx+1]=0;
     openings.push([2*cx+1+dx,2*cy+1+dy]);
     stack.push([nx,ny]);
+  }
+})();
+
+/* ---------- КОМНАТЫ: залы внутри лабиринта ---------- */
+const rooms=[];
+(function makeRooms(){
+  const TYPES=['hall','storage','crypt','fountain'];
+  let tries=0;
+  while(rooms.length<8&&tries<300){
+    tries++;
+    const rw=3+((Math.random()*2)|0), rh=3+((Math.random()*2)|0);
+    const gx0=1+((Math.random()*(G-2-rw))|0), gy0=1+((Math.random()*(G-2-rh))|0);
+    let ok=true;
+    if(gx0<=3&&gy0<=3)ok=false;                       // не у старта
+    for(let y=gy0-1;y<=gy0+rh&&ok;y++)for(let x=gx0-1;x<=gx0+rw&&ok;x++){
+      if(x<1||y<1||x>=G-1||y>=G-1){ok=false;break;}
+      if(x===G-2&&y===G-2){ok=false;break;}           // не на выходе
+      for(const r of rooms){
+        if(x>=r.x0-1&&x<r.x0+r.w+1&&y>=r.y0-1&&y<r.y0+r.h+1){ok=false;break;}
+      }
+    }
+    if(!ok)continue;
+    for(let y=gy0;y<gy0+rh;y++)for(let x=gx0;x<gx0+rw;x++)grid[y][x]=0;
+    /* проверка связности с лабиринтом */
+    let connected=false;
+    outer:
+    for(let y=gy0;y<gy0+rh;y++)for(let x=gx0;x<gx0+rw;x++){
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+dx,ny=y+dy;
+        if(nx<0||ny<0||nx>=G||ny>=G)continue;
+        if(nx>=gx0&&nx<gx0+rw&&ny>=gy0&&ny<gy0+rh)continue;
+        if(grid[ny][nx]===0){connected=true;break outer;}
+      }
+    }
+    if(!connected){
+      /* BFS к ближайшему полу вне комнаты, прокопать туннель */
+      const seen=new Set([gx0+'_'+gy0]), prev=new Map(), q=[[gx0,gy0]];
+      let target=null;
+      while(q.length&&!target){
+        const [cx,cy]=q.shift();
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+          const nx=cx+dx,ny=cy+dy;
+          if(nx<1||ny<1||nx>=G-1||ny>=G-1)continue;
+          const k=nx+'_'+ny;
+          if(seen.has(k))continue;
+          seen.add(k); prev.set(k,[cx,cy]);
+          const inRoom=nx>=gx0&&nx<gx0+rw&&ny>=gy0&&ny<gy0+rh;
+          if(!inRoom&&grid[ny][nx]===0){target=[nx,ny];break;}
+          q.push([nx,ny]);
+        }
+      }
+      if(!target){ // изолированное место — откатить
+        for(let y=gy0;y<gy0+rh;y++)for(let x=gx0;x<gx0+rw;x++)grid[y][x]=1;
+        continue;
+      }
+      let cur=target;
+      while(cur){
+        grid[cur[1]][cur[0]]=0;
+        cur=prev.get(cur[0]+'_'+cur[1]);
+        if(cur&&cur[0]>=gx0&&cur[0]<gx0+rw&&cur[1]>=gy0&&cur[1]<gy0+rh)break;
+      }
+    }
+    rooms.push({x0:gx0,y0:gy0,w:rw,h:rh,type:TYPES[rooms.length%TYPES.length]});
   }
 })();
 
@@ -303,6 +370,26 @@ const floor=new THREE.Mesh(new THREE.PlaneGeometry(G*S,G*S),new THREE.MeshLamber
 floor.rotation.x=-Math.PI/2; scene.add(floor);
 const ceil=new THREE.Mesh(new THREE.PlaneGeometry(G*S,G*S),new THREE.MeshLambertMaterial({map:brickTex(),color:0x555058}));
 ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; scene.add(ceil);
+/* деревянные балки под потолком */
+{
+  const beamMat=new THREE.MeshLambertMaterial({color:0x4a3826});
+  const bg=new THREE.BoxGeometry(G*S,0.28,0.42);
+  for(let i=1;i<G;i+=2){
+    const b=new THREE.Mesh(bg,beamMat);
+    b.position.set(0,WALL_H-0.16,wx(i));
+    scene.add(b);
+  }
+}
+
+// общая текстура свечения (факелы, жаровни)
+const torchGlowTex=(()=>{
+  const c=document.createElement('canvas'); c.width=c.height=64;
+  const gg=c.getContext('2d');
+  const gr=gg.createRadialGradient(32,32,2,32,32,30);
+  gr.addColorStop(0,'rgba(255,176,80,0.85)'); gr.addColorStop(1,'rgba(255,120,20,0)');
+  gg.fillStyle=gr; gg.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+})();
 
 // факелы на стенах (декор) + свечение
 {
@@ -310,13 +397,7 @@ ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; scene.add(ceil);
   const tMat=new THREE.MeshBasicMaterial({color:0xff9a33});
   const fGeo=new THREE.BoxGeometry(0.1,0.3,0.1);
   const fMat=new THREE.MeshLambertMaterial({color:0x3a2c1a});
-  const glowC=document.createElement('canvas'); glowC.width=glowC.height=64;
-  { const gg=glowC.getContext('2d');
-    const gr=gg.createRadialGradient(32,32,2,32,32,30);
-    gr.addColorStop(0,'rgba(255,176,80,0.85)'); gr.addColorStop(1,'rgba(255,120,20,0)');
-    gg.fillStyle=gr; gg.fillRect(0,0,64,64); }
-  const glowTex=new THREE.CanvasTexture(glowC);
-  const glowMat=new THREE.SpriteMaterial({map:glowTex,transparent:true,opacity:0.8,depthWrite:false,blending:THREE.AdditiveBlending});
+  const glowMat=new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.8,depthWrite:false,blending:THREE.AdditiveBlending});
   const n=40;
   for(let i=0;i<n;i++){
     const [cx,cy]=floorCells[(Math.random()*floorCells.length)|0];
@@ -330,10 +411,62 @@ ceil.rotation.x=Math.PI/2; ceil.position.y=WALL_H; scene.add(ceil);
   }
 }
 
+/* ---------- ОБСТАНОВКА КОМНАТ ---------- */
+const fountains=[];
+{
+  const stoneM=new THREE.MeshLambertMaterial({color:0x7a7468});
+  const woodMat=new THREE.MeshLambertMaterial({color:0x6b4a26});
+  for(const r of rooms){
+    const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
+    if(r.type==='hall'){
+      const rug=new THREE.Mesh(new THREE.PlaneGeometry(r.w*S-1.2,r.h*S-1.2),new THREE.MeshLambertMaterial({color:0x5a1420}));
+      rug.rotation.x=-Math.PI/2; rug.position.set(cx,0.02,cz); scene.add(rug);
+      const pGeo=new THREE.CylinderGeometry(0.32,0.38,WALL_H,10);
+      for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+        const pl=new THREE.Mesh(pGeo,stoneM); pl.position.set(cx+sx*(r.w*S/2-0.7),WALL_H/2,cz+sz*(r.h*S/2-0.7)); scene.add(pl);
+      }
+      const brazier=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.45,0.6,8),new THREE.MeshLambertMaterial({color:0x3a2f26}));
+      brazier.position.set(cx,0.3,cz); scene.add(brazier);
+      const fire=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8),new THREE.MeshBasicMaterial({color:0xff8a30}));
+      fire.position.set(cx,0.75,cz); scene.add(fire);
+      const fg=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.9,depthWrite:false,blending:THREE.AdditiveBlending}));
+      fg.scale.set(2.4,2.4,1); fg.position.set(cx,1.0,cz); scene.add(fg);
+      scene.add(new THREE.PointLight(0xff9040,6,10,2).translateX(cx).translateY(1.6).translateZ(cz));
+    }
+    if(r.type==='storage'){
+      for(let i=0;i<5;i++){
+        const s=0.5+Math.random()*0.4;
+        const cr=new THREE.Mesh(new THREE.BoxGeometry(s,s,s),woodMat);
+        cr.position.set(wx(r.x0+((Math.random()*r.w)|0))+(Math.random()-0.5)*1.2,s/2,wx(r.y0+((Math.random()*r.h)|0))+(Math.random()-0.5)*1.2);
+        cr.rotation.y=Math.random()*Math.PI; scene.add(cr);
+      }
+    }
+    if(r.type==='crypt'){
+      for(let i=0;i<3;i++){
+        const cf=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,0.7),stoneM);
+        cf.position.set(wx(r.x0+((Math.random()*r.w)|0))+(Math.random()-0.5),0.25,wx(r.y0+((Math.random()*r.h)|0))+(Math.random()-0.5));
+        cf.rotation.y=(i%2)*Math.PI/2; scene.add(cf);
+      }
+      const sk=new THREE.Mesh(new THREE.SphereGeometry(0.14,6,6),new THREE.MeshLambertMaterial({color:0xd8d2c0}));
+      sk.position.set(cx,0.12,cz+0.6); scene.add(sk);
+    }
+    if(r.type==='fountain'){
+      const base=new THREE.Mesh(new THREE.CylinderGeometry(0.85,1.0,0.55,12),stoneM);
+      base.position.set(cx,0.27,cz); scene.add(base);
+      const water=new THREE.Mesh(new THREE.CylinderGeometry(0.72,0.72,0.1,12),
+        new THREE.MeshBasicMaterial({color:0x3aa0e0,transparent:true,opacity:0.8}));
+      water.position.set(cx,0.6,cz); scene.add(water);
+      fountains.push({x:cx,z:cz,water});
+    }
+  }
+}
+
 /* ================== ДВЕРИ (ровно 100) ================== */
 const doorAt=new Map();               // "x_y" -> door
 const shuffleOpen=shuffle(openings.slice());
-const doorDefs=shuffleOpen.slice(0,100);
+const inRoom=(x,y)=>rooms.some(r=>x>=r.x0&&x<r.x0+r.w&&y>=r.y0&&y<r.y0+r.h);
+const roomFree=shuffleOpen.filter(([x,y])=>!inRoom(x,y));
+const doorDefs=(roomFree.length>=100?roomFree:shuffleOpen).slice(0,100);
 
 function plaqueTex(n,reward){
   const c=document.createElement('canvas'); c.width=c.height=96;
@@ -406,6 +539,34 @@ const fakeDoors=[];
   }
 }
 
+/* ---------- ДЕКОР ПОЛА: мох и щебень ---------- */
+{
+  const mossC=document.createElement('canvas'); mossC.width=mossC.height=64;
+  const mg=mossC.getContext('2d');
+  const mgr=mg.createRadialGradient(32,32,4,32,32,30);
+  mgr.addColorStop(0,'rgba(60,110,40,0.7)'); mgr.addColorStop(1,'rgba(60,110,40,0)');
+  mg.fillStyle=mgr; mg.fillRect(0,0,64,64);
+  const mossTex=new THREE.CanvasTexture(mossC);
+  for(let i=0;i<26;i++){
+    const [x,y]=floorCells[(Math.random()*floorCells.length)|0];
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(1.2+Math.random(),1.2+Math.random()),
+      new THREE.MeshBasicMaterial({map:mossTex,transparent:true,depthWrite:false}));
+    m.rotation.x=-Math.PI/2; m.rotation.z=Math.random()*Math.PI;
+    m.position.set(wx(x)+(Math.random()-0.5)*1.4,0.012,wx(y)+(Math.random()-0.5)*1.4);
+    scene.add(m);
+  }
+  const rub=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.1,0),new THREE.MeshLambertMaterial({color:0x8a8478}),60);
+  { const m=new THREE.Matrix4(); let i=0, guard=0;
+    while(i<60&&guard++<500){
+      const [x,y]=floorCells[(Math.random()*floorCells.length)|0];
+      if(doorAt.has(x+'_'+y))continue;
+      m.makeTranslation(wx(x)+(Math.random()-0.5)*1.8,0.05,wx(y)+(Math.random()-0.5)*1.8);
+      rub.setMatrixAt(i++,m);
+    }
+    scene.add(rub);
+  }
+}
+
 /* ---------- ловушки: визуал ---------- */
 function makeSpikes(gx,gy){
   const g=new THREE.Group();
@@ -453,6 +614,12 @@ function placeItems(){
   const teeth=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.05,0.05),kMat); teeth.position.set(0.05,-0.4,0);
   kg.add(ring,shaft,teeth); kg.position.set(wx(keyCell[0])+0.5,0.8,wx(keyCell[1])+0.5);
   scene.add(kg); items.push({mesh:kg,type:'key'});
+  // гарантированный лут в комнатах
+  for(const r of rooms){
+    const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
+    if(r.type==='storage')dropAt(cx+0.6,cz+0.6,'food');
+    if(r.type==='crypt')dropAt(cx+0.6,cz+0.6,'med');
+  }
   // аптечки
   for(let i=0;i<8;i++){
     const [x,y]=cells[ci++];
@@ -558,11 +725,12 @@ function makeKnight(){
 
 const enemies=[];
 const ENEMY_STATS={
-  ghost:     {hp:30,  speed:2.3, dmg:8,  atkCd:1.2, ghost:true},
-  knight:    {hp:70,  speed:3.1, dmg:16, atkCd:1.5},
-  bossGhost: {hp:320, speed:2.7, dmg:26, atkCd:1.3, ghost:true, boss:true, name:'ВЛАДЫКА ЗАМКА'},
-  bossKnight:{hp:240, speed:3.4, dmg:24, atkCd:1.2, boss:true, name:'КОМАНДОР ТЬМЫ'},
-  kaver:     {hp:60,  speed:0,   dmg:12, atkCd:1,   name:'Каверга'},
+  ghost:     {hp:30,  speed:2.3, dmg:6,  atkCd:1.2, ghost:true},
+  knight:    {hp:70,  speed:3.1, dmg:12, atkCd:1.5},
+  pilgor:    {hp:40,  speed:3.4, dmg:8,  atkCd:1.4},
+  bossGhost: {hp:320, speed:2.7, dmg:20, atkCd:1.3, ghost:true, boss:true, name:'ВЛАДЫКА ЗАМКА'},
+  bossKnight:{hp:240, speed:3.4, dmg:18, atkCd:1.2, boss:true, name:'КОМАНДОР ТЬМЫ'},
+  kaver:     {hp:60,  speed:0,   dmg:9,  atkCd:1,   name:'Каверга'},
 };
 function makeKaver(){
   const g=new THREE.Group();
@@ -582,8 +750,32 @@ function makeKaver(){
   g.add(body,head,earL,earR,e1,e2,grin,armL,armR);
   return g;
 }
-const KAVER_CMDS=[{key:'stand',label:'СТОЯТЬ'},{key:'jump',label:'ПРЫГАТЬ'},{key:'run',label:'БЕГИ'}];
-const KAVER_TAUNTS=[
+function makePilgor(){
+  const g=new THREE.Group();
+  const fur=new THREE.MeshLambertMaterial({color:0x5a4634});
+  const dark=new THREE.MeshLambertMaterial({color:0x33261c});
+  const body=new THREE.Mesh(new THREE.SphereGeometry(0.38,10,8),fur);
+  body.scale.set(1.25,0.8,1); body.position.y=0.42;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.24,10,8),fur);
+  head.position.set(0,0.45,0.42);
+  const eyeMat=new THREE.MeshBasicMaterial({color:0xff3020});
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),eyeMat); e1.position.set(-0.1,0.55,0.62);
+  const e2=e1.clone(); e2.position.x=0.1;
+  const toothMat=new THREE.MeshBasicMaterial({color:0xf0e8d0});
+  const t1=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.05),toothMat); t1.position.set(-0.06,0.32,0.6);
+  const t2=t1.clone(); t2.position.x=0.06;
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(0.08,0.5,6),dark);
+  tail.position.set(0,0.5,-0.55); tail.rotation.x=1.2;
+  const legG=new THREE.BoxGeometry(0.09,0.28,0.09);
+  const l1=new THREE.Mesh(legG,dark); l1.position.set(-0.2,0.14,0.25);
+  const l2=l1.clone(); l2.position.x=0.2;
+  const l3=l1.clone(); l3.position.z=-0.25;
+  const l4=l3.clone(); l4.position.x=0.2;
+  g.add(body,head,e1,e2,t1,t2,tail,l1,l2,l3,l4);
+  g.userData.legs=[l1,l2,l3,l4];
+  return g;
+}
+const KAVER_CMDS=[{key:'stand',label:'СТОЯТЬ'},{key:'jump',label:'ПРЫГАТЬ'},{key:'run',label:'БЕГИ'}];const KAVER_TAUNTS=[
   '👺 Каверга хихикает где-то в стенах...',
   '👺 Каверга: «Я уже близко-о-о»',
   'Шёпот: «не открывай следующую дверь...»',
@@ -634,7 +826,7 @@ function updateKaver(en,dt){
       msg('Каверга недовольно шипит и испаряется...','#9a8ab0');
       beep(700,180,0.4,'sawtooth',0.15);
     }else{
-      damage(12*diff.dmg,'Каверга влепила тебе пощёчину за непослушание!');
+      damage(9*diff.dmg,'Каверга влепила тебе пощёчину за непослушание!');
       msg(`👺 Каверга: «${en.command.label}!!! Я ЖЕ СКАЗАЛА!»`,'#ff7ad0');
     }
     en.state='hidden'; en.mesh.visible=false; en.hauntT=25+Math.random()*15;
@@ -648,8 +840,9 @@ function spawnEnemy(kind){
     return d>16&&!doorAt.has(x+'_'+y);
   }));
   const [x,y]=cells[0]||[G-2,1];
-  const mesh=st.ghost?makeGhost():kind==='kaver'?makeKaver():makeKnight();
+  const mesh=st.ghost?makeGhost():kind==='kaver'?makeKaver():kind==='pilgor'?makePilgor():makeKnight();
   mesh.position.set(wx(x),st.ghost?1.5:0,wx(y));
+  if(kind==='pilgor')mesh.scale.setScalar(1.2);
   if(st.boss){
     mesh.scale.setScalar(st.ghost?2.2:1.9);
     mesh.traverse(o=>{
@@ -705,6 +898,7 @@ function spawnAll(){
   if(spawned)return; spawned=true;
   for(let i=0;i<diff.ghosts;i++)spawnEnemy('ghost');
   for(let i=0;i<diff.knights;i++)spawnEnemy('knight');
+  for(let i=0;i<diff.pilgors;i++)spawnEnemy('pilgor');
   spawnEnemy('kaver');
 }
 
@@ -802,9 +996,9 @@ function flash(){const v=$('vignette');v.style.opacity=0.9;setTimeout(()=>v.styl
 /* ================== УПРАВЛЕНИЕ ================== */
 /* ================== СЛОЖНОСТИ ================== */
 const DIFFS={
-  easy:  {dmg:0.6,  trap:0.6,  decay:0.8,  ghosts:5,  knights:3, desc:'Враги: 5 призраков и 3 рыцаря • ловушки ×0.6'},
-  normal:{dmg:1,    trap:1,    decay:1,    ghosts:8,  knights:6, desc:'Враги: 8 призраков и 6 рыцарей • ловушки ×1.0'},
-  hard:  {dmg:1.45, trap:1.3,  decay:1.35, ghosts:11, knights:9, desc:'Враги: 11 призраков и 9 рыцарей • ловушки ×1.3'},
+  easy:  {dmg:0.5,  trap:0.6,  decay:0.8,  ghosts:5,  knights:3, pilgors:2, desc:'Враги: 5 призраков, 3 рыцаря и 2 пилгора • урон и ловушки снижены'},
+  normal:{dmg:0.7,  trap:1,    decay:1,    ghosts:8,  knights:6, pilgors:3, desc:'Враги: 8 призраков, 6 рыцарей и 3 пилгора • урон снижен на треть'},
+  hard:  {dmg:1.05, trap:1.3,  decay:1.35, ghosts:11, knights:9, pilgors:5, desc:'Враги: 11 призраков, 9 рыцарей и 5 пилгоров • для храбрых'},
 };
 let diff=DIFFS.normal;
 document.querySelectorAll('.diffbtn').forEach(b=>{
@@ -848,6 +1042,7 @@ function startRunning(){
   $('hud').classList.remove('hidden');
   spawnAll();
   lastSafe.x=player.pos.x; lastSafe.z=player.pos.z; lastSafe.t=elapsed; // точка спавна = безопасная
+  if(isTouch){try{const fs=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(fs&&fs.catch)fs.catch(()=>{});}catch(e){}}
   let p;
   try{ p=renderer.domElement.requestPointerLock(); }catch(e){ p=null; }
   if(p&&p.catch)p.catch(()=>{
@@ -1011,7 +1206,7 @@ function killEnemy(en){
     msg('👺 Каверга повержена! Обронила аптечку!','#7ae07a');
     dropMed(en.mesh.position.x,en.mesh.position.z);
   } else {
-    msg(en.kind==='ghost'?'Призрак развеян!':'Рыцарь повержен!','#9fd0ff');
+    msg(en.kind==='ghost'?'Призрак развеян!':en.kind==='pilgor'?'Пилгор издох!':'Рыцарь повержен!','#9fd0ff');
   }
 }
 
@@ -1155,7 +1350,7 @@ function update(dt){
   const movedFar=(player.pos.x-stuckX)**2+(player.pos.z-stuckZ)**2>0.25;
   if(movingKeys&&!movedFar){
     stuckT+=dt;
-    if(stuckT>3&&stuckMsgCd<=0){stuckMsgCd=15;msg('⚠ Застрял? Удерживай [R] — вернёшься в безопасную точку.','#e8c86a');}
+    if(stuckT>3&&stuckMsgCd<=0){stuckMsgCd=15;msg(`⚠ Застрял? Удерживай ${isTouch?'[🧭]':'[R]'} — вернёшься в безопасную точку.`,'#e8c86a');}
   } else {stuckT=0;stuckX=player.pos.x;stuckZ=player.pos.z;}
   if(stuckMsgCd>0)stuckMsgCd-=dt;
   if(keys['KeyR']&&!dead&&!won){
@@ -1194,12 +1389,12 @@ function update(dt){
   const foodRate=(sprint&&(mx||mz))?2.6:1;
   player.food=Math.max(0,player.food-dt*(100/300)*foodRate*diff.decay);
   player.water=Math.max(0,player.water-dt*(100/230)*diff.decay);
-  if(player.food<=0)player.hp=Math.max(0,player.hp-dt*2);
-  if(player.water<=0)player.hp=Math.max(0,player.hp-dt*2.5);
+  if(player.food<=0)player.hp=Math.max(0,player.hp-dt*1.2);
+  if(player.water<=0)player.hp=Math.max(0,player.hp-dt*1.5);
   if(player.hp<=0&&!dead)die('Ты умер от истощения.');
   if(player.poison>0){
     player.poison-=dt;
-    player.hp=Math.max(0,player.hp-dt*5);
+    player.hp=Math.max(0,player.hp-dt*3.5);
     $('poisveil').style.opacity=0.8;
     if(player.hp<=0)die('Яд из ловушки убил тебя.');
   } else $('poisveil').style.opacity=0;
@@ -1227,11 +1422,11 @@ function update(dt){
           else if(d.spike.scale.y>0)d.spike.scale.y=Math.max(0,d.spike.scale.y-dt*0.8);
         }
         const spikesUp=d.spike.scale.y>0.5;
-        if(!d.triggered&&dist<1.15&&feet<0.85){d.triggered=true;d.hurtT=0;sTrap();vib(150);damage(22*diff.trap,'Шипы за дверью пронзили тебя!');}
-        if(d.triggered&&spikesUp&&dist<1.0&&feet<0.85){d.hurtT-=dt;if(d.hurtT<=0){d.hurtT=0.6;damage(8*diff.trap,null);}}
+        if(!d.triggered&&dist<1.15&&feet<0.85){d.triggered=true;d.hurtT=0;sTrap();vib(150);damage(16*diff.trap,'Шипы за дверью пронзили тебя!');}
+        if(d.triggered&&spikesUp&&dist<1.0&&feet<0.85){d.hurtT-=dt;if(d.hurtT<=0){d.hurtT=0.6;damage(6*diff.trap,null);}}
       }
       if(d.trap==='gas'&&d.gas){
-        if(!d.triggered&&dist<1.4){d.triggered=true;sTrap();vib(120);player.poison=5;msg('Ядовитый газ! Беги!','#7ae07a');}
+        if(!d.triggered&&dist<1.4){d.triggered=true;sTrap();vib(120);player.poison=4;msg('Ядовитый газ! Беги!','#7ae07a');}
         if(!d.triggered)d.gas.material.opacity=Math.min(0.05,d.gas.material.opacity+dt*0.2);
         else{ // облако растёт, а через 8 секунд рассеивается и исчезает
           d.gasLife=(d.gasLife||0)+dt;
@@ -1251,7 +1446,7 @@ function update(dt){
             bolt.position.set(wx(d.gx)-dir.x*1,1.4,wx(d.gy)-dir.z*1);
             bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
             scene.add(bolt); setTimeout(()=>scene.remove(bolt),700);
-            if(dist<1.8&&player.pos.y<2.05){damage(16*diff.trap,'Дротик из-за двери попал в тебя!');}
+            if(dist<1.8&&player.pos.y<2.05){damage(12*diff.trap,'Дротик из-за двери попал в тебя!');}
             else{beep(320,90,0.18,'square',0.1);msg('Дротик свистнул мимо — ты увернулся!','#7ae07a');}
           }
         }
@@ -1266,7 +1461,7 @@ function update(dt){
     if(dist<ndF){ndF=dist;nFake=f;}
   }
   if(!nearDoor&&nFake)nearDoor=nFake;
-  if(nearDoor){prompt.style.display='block';prompt.textContent=`E — открыть дверь #${nearDoor.num}${(!nearDoor.fake&&nearDoor.warn)?' (на двери следы крови!)':''}`;}
+  if(nearDoor){prompt.style.display='block';prompt.textContent=`${isTouch?'🚪':'E'} — открыть дверь #${nearDoor.num}${(!nearDoor.fake&&nearDoor.warn)?' (на двери следы крови!)':''}`;}
   else prompt.style.display='none';
 
   /* --- предметы --- */
@@ -1320,8 +1515,55 @@ function update(dt){
     /* призраки «чувствуют» игрока сквозь стены (ближе), остальные — только по прямой видимости */
     const isGhost=en.kind==='ghost';
     const seen=dist<(isGhost?11:13)&&(isGhost||los(ex,ez,player.pos.x,player.pos.z));
-    if(seen)en.state='chase';
+    if(seen&&en.state!=='aim'&&en.state!=='dash'&&en.state!=='stun')en.state='chase';
     else if(en.state==='chase'&&(dist>17||!seen))en.state='wander';
+
+    /* ПИЛГОР: скрежещет-приседает (0.6с) и делает рывок; врезался в стену — оглушён */
+    if(en.kind==='pilgor'){
+      if(en.state==='aim'){
+        en.aimT-=dt;
+        en.mesh.rotation.y=Math.atan2(player.pos.x-en.aimX,player.pos.z-en.aimZ);
+        en.mesh.position.x=en.aimX+Math.sin(en.t*40)*0.05;
+        en.mesh.position.z=en.aimZ+Math.cos(en.t*33)*0.05;
+        en.mesh.position.y=0;
+        if(en.aimT<=0){
+          en.state='dash';
+          en.dashX=(player.pos.x-en.aimX)/dist;
+          en.dashZ=(player.pos.z-en.aimZ)/dist;
+          beep(200,900,0.3,'sawtooth',0.18);
+        }
+        continue;
+      }
+      if(en.state==='dash'){
+        const step=8.5*dt;
+        const ox2=en.mesh.position.x, oz2=en.mesh.position.z;
+        moveWithCollision(en.mesh.position,0.4,en.dashX*step,en.dashZ*step,true,false,false);
+        const moved=Math.hypot(en.mesh.position.x-ox2,en.mesh.position.z-oz2);
+        en.mesh.rotation.y=Math.atan2(en.dashX,en.dashZ);
+        en.mesh.position.y=0;
+        if(moved<step*0.55){ // ткнулся в стену
+          en.state='stun'; en.stunT=1.3; en.cd=2.6; beep(120,60,0.25,'square',0.15);
+        }else{
+          const d2p=Math.hypot(player.pos.x-en.mesh.position.x,player.pos.z-en.mesh.position.z);
+          if(d2p<1.1&&!playerInSafe&&player.pos.y<2.1){
+            damage(en.dmg*diff.dmg,'Пилгор врезался в тебя на полном ходу!');
+            en.state='chase'; en.cd=2.6;
+          }
+        }
+        continue;
+      }
+      if(en.state==='stun'){
+        en.stunT-=dt;
+        en.mesh.rotation.z=Math.sin(en.t*20)*0.12;
+        en.mesh.position.y=0;
+        if(en.stunT<=0){en.state='chase';en.mesh.rotation.z=0;}
+        continue;
+      }
+      if(en.state==='chase'&&dist>3&&dist<10&&en.cd<=0&&!playerInSafe&&player.pos.y<2.2&&los(ex,ez,player.pos.x,player.pos.z)){
+        en.state='aim'; en.aimT=0.6; en.aimX=ex; en.aimZ=ez; sRattle();
+        continue;
+      }
+    }
 
     let vx=0,vz=0;
     if(en.state==='chase'){
@@ -1361,6 +1603,13 @@ function update(dt){
     en.mesh.position.y=(en.kind==='ghost'?1.5+Math.sin(en.t*2.5)*0.15:0);
   }
 
+  /* --- фонтаны восполняют воду --- */
+  for(const f of fountains){
+    if(Math.hypot(player.pos.x-f.x,player.pos.z-f.z)<1.7&&player.water<100){
+      player.water=Math.min(100,player.water+8*dt);
+    }
+  }
+
   /* --- безопасные зоны --- */
   playerInSafe=false;
   for(const z of safeZones){
@@ -1387,7 +1636,7 @@ function update(dt){
       if(best){
         player.pos.x=best[0]; player.pos.z=best[1]; player.vy=0;
         player.safeT=0; player.warnedSafe=false;
-        damage(12*diff.dmg,'Щит безопасной зоны выбросил тебя!');
+        damage(8*diff.dmg,'Щит безопасной зоны выбросил тебя!');
       }
     }
   }else{
@@ -1457,6 +1706,7 @@ window.__game={get running(){return running},set running(v){running=v},
   spawnBoss, get diff(){return diff}, get safeZones(){return safeZones},
   get playerInSafe(){return playerInSafe},
   get grid(){return grid},get doorAt(){return doorAt},get zoneCells(){return zoneCells},
+  get rooms(){return rooms},get fountains(){return fountains},
   get solid(){return solid},get circleHits(){return circleHits},
   get wx(){return wx},get OR(){return OR},get S(){return S},get G(){return G},
   get exitPos(){return exitPos},get hasKey(){return player.hasKey}};
