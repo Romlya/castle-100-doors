@@ -77,6 +77,15 @@
   .keys{margin-top:10px;font-size:14px;color:#a8a090;line-height:1.8;}
   .menurow{display:flex;gap:10px;margin-top:16px;}
   .menurow button{margin:0 !important;font-size:16px !important;padding:10px 26px !important;background:#2a2418 !important;}
+  /* ===== v11.4: меню-статистика и баффы ===== */
+  .statstrip{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;align-items:center;
+    background:rgba(20,16,10,.7);border:1px solid #55482a;border-radius:10px;
+    padding:9px 20px;margin:12px auto 0;font-size:15px;color:#cfc7b8;max-width:min(520px,92vw);}
+  .statstrip b{color:#ffd75e;}
+  .statstrip span{white-space:nowrap;}
+  #buffbar{position:absolute;top:92px;left:50%;transform:translateX(-50%);display:none;
+    font-size:14px;color:#9ae0ff;text-shadow:0 0 6px #003;white-space:nowrap;
+    background:rgba(10,20,40,.55);padding:4px 14px;border-radius:6px;border:1px solid #3a5a7a;}
   /* ===== РЕДИЗАЙН МЕНЮ (v10) ===== */
   #startOv,#loadOv,#pauseOv{background:radial-gradient(ellipse at 50% 20%,rgba(40,30,12,.92),rgba(3,3,7,.97) 70%);}
   #startOv::before{content:'';position:absolute;inset:0;pointer-events:none;
@@ -106,6 +115,7 @@
     <div class="barwrap"><div class="bar" id="waterbar" style="width:100%"></div><div class="barlabel">ВОДА <b id="waternum">100</b></div></div>
   </div>
   <div id="doorcount">Двери: 0 / 100 • 🪙 0</div>
+  <div id="buffbar"></div>
   <div id="nexthint" style="display:none"></div>
   <div id="keyicon">🗝 Золотой ключ получен — открой все 100 дверей и найди выход!</div>
   <div id="bossbar" style="display:none">
@@ -145,20 +155,18 @@
 
 <div class="overlay hidden" id="startOv">
   <h1>🏰 ЗАМОК 100 ДВЕРЕЙ</h1>
-  <p>Ты заперт в древнем замке. За 100 дверями скрываются ловушки, еда, вода и смерть.
-     Найди <b>хлеб</b>, <b>фляги с водой</b> и <b>аптечки</b>, отыщи <b>золотой ключ</b>
-     и выберись через <b>зелёную выходную дверь</b> в дальнем углу.
-     Призраки, рыцари, **пилгоры** и два босса будут мешать, а <b>Каверга</b> будет появляться
-     у тебя перед лицом и приказывать: «СТОЯТЬ!», «ПРЫГАТЬ!», «БЕГИ!» — выполняй, иначе получишь пощёчину!
-     Многие двери <b>замурованы</b>!<br>
-     <b>Двери открываются только по порядку номеров</b> — 1, 2, 3… до 100. Следи за подсказкой сверху:
-     она показывает номер следующей двери и стрелку, куда идти. <b>Выход откроется, только когда открыты ВСЕ 100 дверей!</b><br>
-     Убивай <b>пилгоров</b> — они роняют 🪙 <b>пильгорцы</b> (ещё +1 за каждую дверь), а за них Мопс и Добрый Пилгор
-     продают еду, аптечки и оружие (<b>M</b> — магазин, <b>I</b> — инвентарь).
-     За полное прохождение — <b>🪙 +100 пильгорцев</b>!
-     <b>Пильгорцы и покупки сохраняются</b> даже после закрытия игры.<br>
-     <span style="color:#ffb0d0">🐕 Легендарного МОПСА нельзя купить — он спрятан в тайной комнате.
-     Шанс найти её — <b>1 к 100 000</b>. Легенда ждёт самого упорного!</span></p>
+  <p>Ты заперт в древнем замке: <b>100 дверей открываются строго по порядку</b> — следи за подсказкой сверху.
+     Ищи <b>золотой ключ</b>, хлеб, воду и аптечки, а в конце ждёт тронный зал и <b>зелёный выход</b>.
+     Призраки, рыцари, <b>пилгоры</b>, Каверга с приказами и два босса будут мешать.<br>
+     Убивай врагов — за 🪙 <b>пильгорцы</b> Мопс и Добрый Пилгор продают еду, зелья и оружие
+     (<b>M</b> — лавка, <b>I</b> — инвентарь). Покупки <b>сохраняются</b> между заходами.
+     За полное прохождение — 🪙 <b>+100</b>!
+     <span style="color:#ffb0d0">Легендарного МОПСА нельзя купить — только тайная комната (1 к 100 000).</span></p>
+  <div class="statstrip">
+    <span>🪙 Пильгорцы: <b id="mCoins">0</b></span>
+    <span>🏆 Рекорд: <b id="mBest">—</b></span>
+    <span id="mPets"></span>
+  </div>
   <div class="diffrow" id="diffrow">
     <button class="diffbtn" data-d="easy">ЛЁГКИЙ</button>
     <button class="diffbtn sel" data-d="normal">НОРМА</button>
@@ -189,6 +197,7 @@
 
 <div class="overlay hidden" id="pauseOv">
   <h2>Пауза</h2>
+  <div class="statstrip" id="pauseStats"></div>
   <p>Кликни, чтобы продолжить (B — отпустить/вернуть мышь)</p>
   <div class="menurow">
     <button id="pShopBtn" class="menubtn">🛒 ЛАВКА</button>
@@ -1706,6 +1715,7 @@ function dropLoot(px,pz){
 }
 const player={pos:new THREE.Vector3(wx(2),1.6,wx(2)),yaw:-Math.PI/2,pitch:0,
   hp:100,food:100,water:100,poison:0,hasKey:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
+  buffSpeed:0,buffArmor:0, // v11.4: секунды действия зелья скорости / оберега
   coins:0,medkits:0,hasMops:false,hasPilFriend:false,weapon:'blade',weapons:['blade']};
 /* ---------- КОШЕЛЁК: пильгорцы и покупки сохраняются между заходами ---------- */
 const WALLET_KEY='castle100wallet';
@@ -1731,6 +1741,22 @@ function saveWallet(){
   }catch(e){}
 }
 /* loadWallet() вызывается позже — после объявления WEAPONS (см. loadStep 97) */
+/* ---------- РЕКОРД (v11.4): лучшая дверь за все заходы ---------- */
+const BEST_KEY='castle100best';
+function bestDoorVal(){return parseInt(localStorage.getItem(BEST_KEY)||'0',10)||0;}
+function saveBest(){try{if(openedDoors>bestDoorVal())localStorage.setItem(BEST_KEY,String(openedDoors));}catch(e){}}
+function renderMenuStats(){
+  const mc=$('mCoins'); if(mc)mc.textContent=player.coins;
+  const mb=$('mBest'); if(mb)mb.textContent=bestDoorVal()?('дверь '+bestDoorVal()):'—';
+  const mp=$('mPets');
+  if(mp){
+    const pets=(player.hasMops?'🐕 Мопс ':'')+(player.hasPilFriend?'🐐 Пилгор':'');
+    mp.textContent=pets||'🐾 Питомцев нет';
+  }
+  const ps=$('pauseStats');
+  if(ps)ps.innerHTML=`🚪 Двери: <b>${openedDoors}/100</b> • ♥ <b>${Math.ceil(player.hp)}</b> • 🪙 <b>${player.coins}</b>`
+    +(player.hasMops?' • 🐕':'')+(player.hasPilFriend?' • 🐐':'');
+}
 torch.position.copy(player.pos);
 
 let spawned=false;
@@ -1952,6 +1978,7 @@ function startRunning(){
 addEventListener('keydown',e=>{
   if(e.code==='KeyP'&&running&&!dead&&!won){
     running=false; clearKeys(); document.exitPointerLock&&document.exitPointerLock();
+    renderMenuStats(); // v11.4: прогресс в паузе
     $('pauseOv').classList.remove('hidden');
   }
   if(e.code==='KeyM'&&!dead&&!won){
@@ -1976,7 +2003,7 @@ document.addEventListener('pointerlockchange',()=>{
   if(locked){wasLocked=true;manualUnlock=false;running=true;$('pauseOv').classList.add('hidden');}
   else if(wasLocked){
     wasLocked=false;
-    if(!manualUnlock&&running&&!dead&&!won){running=false;$('pauseOv').classList.remove('hidden');}
+    if(!manualUnlock&&running&&!dead&&!won){running=false;renderMenuStats();$('pauseOv').classList.remove('hidden');}
     else if(manualUnlock&&!shopOpen&&!invOpen){msg('🖱 Мышь свободна — нажми B, чтобы вернуть захват','#e8c86a');}
   }
 });
@@ -2291,6 +2318,7 @@ let safeMemoT=0, holdR=0, stuckT=0, stuckMsgCd=0, stuckX=0, stuckZ=0;
 
 function damage(n,why){
   if(dead)return;
+  if(player.buffArmor>0)n*=0.5; // v11.4: оберег режет входящий урон
   player.hp-=n; flash(); sHurt(); vib(70);
   flinchT=0.35; // v11.1: камера вздрагивает от удара
   if(player.hp<=0){ player.hp=0; die(why); }
@@ -2298,6 +2326,8 @@ function damage(n,why){
 function die(why){
   dead=true; running=false;
   document.exitPointerLock();
+  saveBest(); renderMenuStats(); // v11.4: рекорд лучшей двери
+  player.buffSpeed=0; player.buffArmor=0; // эффекты не переживают смерть
   $('deathMsg').textContent=why;
   $('deathStats').textContent=`Открыто дверей: ${openedDoors}/100. Продержался ${Math.floor(elapsed)} c.`;
   /* чекпоинт: за каждые 25 открытых дверей — одно возрождение */
@@ -2333,7 +2363,10 @@ let shopOpen=false, invOpen=false, gameStarted=false;
 const SHOP_GOODS=[
   {id:'bread', name:'🍞 Хлеб', desc:'+30 сытости сразу', cost:5},
   {id:'water', name:'💧 Вода', desc:'+35 воды сразу', cost:5},
+  {id:'roast', name:'🍗 ЖАРКОЕ', desc:'+25 здоровья сразу, прямо в бою', cost:8},
   {id:'med',   name:'💊 Аптечка (в сумку)', desc:'лежит в инвентаре, применить когда угодно (+50 HP)', cost:12},
+  {id:'potion',name:'⚡ ЗЕЛЬЕ СКОРОСТИ', desc:'+40% к скорости на 30 секунд. Пьётся сразу', cost:15},
+  {id:'amulet',name:'🛡 ОБЕРЕГ ТЬМЫ', desc:'входящий урон −50% на 60 секунд', cost:20},
   {id:'axe',   name:'🪓 СЕКИРА', desc:'45 урона! Медленный замах. Сменить оружие — Q', cost:25},
   {id:'spear', name:'🔱 КОПЬЁ', desc:'бьёт на 4.3 м, быстрый укол. Сменить оружие — Q', cost:30},
   {id:'pil',   name:'🐐 ДОБРЫЙ ПИЛГОР', desc:'таранит врагов (−20 HP, раз в 6 с). Редкий зверь!', cost:1911},
@@ -2363,6 +2396,9 @@ function buyGood(id){
   if(id==='bread'){player.food=Math.min(100,player.food+30);msg('🍞 Мопс отдал тебе хлеб. Приятного!','#e0a94b');}
   else if(id==='water'){player.water=Math.min(100,player.water+35);msg('💧 Добрый Пилгор налил тебе воды из фонтана.','#4ba7e0');}
   else if(id==='med'){player.medkits++;msg('💊 Аптечка убрана в сумку (инвентарь — I).','#ff7a7a');}
+  else if(id==='roast'){player.hp=Math.min(100,player.hp+25);msg('🍗 Жаркое съедено: +25 здоровья!','#e09a4b');}
+  else if(id==='potion'){player.buffSpeed=30;msg('⚡ Скорость +40% на 30 секунд! Ноги сами несут!','#9ae0ff');}
+  else if(id==='amulet'){player.buffArmor=60;msg('🛡 Оберег тьмы принял тебя: урон −50% на 60 секунд!','#b0a0ff');}
   else if(id==='axe'||id==='spear'){
     player.weapons.push(id); setWeapon(id);
     msg(`${WEAPONS[id].name} куплена и в руках! Сменить — Q или 1/2/3`,'#e8c86a');
@@ -2376,12 +2412,14 @@ function openShop(){
   if(invOpen)closeInv(true);
   shopOpen=true; running=false; manualUnlock=true;
   document.exitPointerLock&&document.exitPointerLock();
+  renderMenuStats(); // v11.4: обновить плашки меню/паузы
   renderShop();
   $('shopOv').classList.remove('hidden');
 }
 function closeShop(resume){
   shopOpen=false;
   $('shopOv').classList.add('hidden');
+  renderMenuStats(); // v11.4: покупки видны в меню
   if(resume!==false&&!dead&&!won&&gameStarted)startRunning();
 }
 function renderInv(){
@@ -2432,7 +2470,9 @@ for(const [b,fn] of [['menuShopBtn',openShop],['pShopBtn',openShop],['menuInvBtn
 function win(){
   won=true; running=false;
   document.exitPointerLock();
+  saveBest(); // v11.4: рекорд — 100 дверей
   player.coins+=100; saveWallet(); // v10: награда за полное прохождение
+  renderMenuStats();
   sKey();
   $('winStats').textContent=`Ты выбрался из замка! Открыто дверей: ${openedDoors}/100 за ${Math.floor(elapsed)} c. НАГРАДА: 🪙 +100 пильгорцев (всего: ${player.coins})!`;
   $('winOv').classList.remove('hidden');
@@ -2522,7 +2562,7 @@ function update(dt){
   if(keys['ArrowUp'])player.pitch=Math.min(1.5,player.pitch+1.8*dt);
   if(keys['ArrowDown'])player.pitch=Math.max(-1.5,player.pitch-1.8*dt);
   const sprint=keys['ShiftLeft']||keys['ShiftRight']||touchSprint;
-  const spd=(sprint?6.1:4.3)*(player.food<=0||player.water<=0?0.75:1);
+  const spd=(sprint?6.1:4.3)*(player.food<=0||player.water<=0?0.75:1)*(player.buffSpeed>0?1.4:1);
   let mx=0,mz=0;
   if(keys['KeyW'])mz-=1; if(keys['KeyS'])mz+=1;
   if(keys['KeyA'])mx-=1;
@@ -2607,6 +2647,9 @@ function update(dt){
 
   /* --- меч + анимации от первого лица (v11.1) --- */
   player.attackCd-=dt;
+  /* v11.4: затухание эффектов зелья/оберега */
+  if(player.buffSpeed>0){player.buffSpeed-=dt;if(player.buffSpeed<=0){player.buffSpeed=0;msg('⚡ Зелье скорости выдохлось.','#8a9ab0');}}
+  if(player.buffArmor>0){player.buffArmor-=dt;if(player.buffArmor<=0){player.buffArmor=0;msg('🛡 Оберег потух.','#8a9ab0');}}
   /* оружие чуть отстаёт от поворота камеры — живая инерция */
   {
     const dy=player.yaw-prevCamYaw, dp=player.pitch-prevCamPitch;
@@ -2986,6 +3029,14 @@ function update(dt){
   $('foodnum').textContent=Math.ceil(player.food);
   $('waternum').textContent=Math.ceil(player.water);
   $('doorcount').textContent=`Двери: ${openedDoors} / 100 • 🪙 ${player.coins}`;
+  /* v11.4: индикатор активных эффектов */
+  {
+    let bts='';
+    if(player.buffSpeed>0)bts+='⚡ скорость '+Math.ceil(player.buffSpeed)+'с ';
+    if(player.buffArmor>0)bts+='🛡 оберег '+Math.ceil(player.buffArmor)+'с';
+    const bb=$('buffbar');
+    if(bb._t!==bts){bb._t=bts;bb.textContent=bts;bb.style.display=bts?'block':'none';}
+  }
   /* v10: подсказка-компас к СЛЕДУЮЩЕЙ по номеру двери */
   {
     const nd=doors.find(d=>d.num===openedDoors+1);
@@ -3034,6 +3085,7 @@ let menuActive=true, menuT=0, gt=0;
 loadStep(97,'Пробуждаем замок…'); await tick();
 updateWeaponView();
 loadWallet(); // пильгорцы и покупки возвращаются из прошлого захода (WEAPONS уже объявлены)
+renderMenuStats(); // v11.4: плашки статистики в стартовом меню
 /* v10: спавн ТАЙНОЙ КОМНАТЫ МОПСА (жребий брошен в декоре, player уже существует) */
 if(mopsSpot&&!player.hasMops){
   const [mx,mz]=mopsSpot;
