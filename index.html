@@ -1281,60 +1281,122 @@ function woolTex(){ // кучерявая шерсть козы
 
 /* ================== ВРАГИ ================== */
 function makeGhost(){
-  /* ПРИЗРАК-СКИТАЛЕЦ: парящий балахон-конус, капюшон, костяные лапы, глаза-огни */
+  /* ПРИЗРАК-СКИТАЛЕЦ v11.2 (ремодель): двухслойный рваный балахон, капюшон с провалом
+     лица, светящийся знак на груди, ожерелье из костей, лапы-когти, глаза-огни */
   const g=new THREE.Group();
-  const cloak=new THREE.Mesh(new THREE.ConeGeometry(0.42,1.3,10,1,true),
-    new THREE.MeshBasicMaterial({color:0xffffff,map:ghostTex(),transparent:true,opacity:0.6,side:THREE.DoubleSide}));
-  cloak.position.y=0.65;
-  const hood=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),
-    new THREE.MeshBasicMaterial({color:0x2a2438,transparent:true,opacity:0.92}));
-  hood.position.y=1.26; hood.scale.set(1,0.85,1);
+  const cloakMat=new THREE.MeshBasicMaterial({color:0xffffff,map:ghostTex(),transparent:true,opacity:0.62,side:THREE.DoubleSide});
+  const cloak=new THREE.Mesh(new THREE.ConeGeometry(0.46,1.5,10,1,true),cloakMat);
+  cloak.position.y=0.78;
+  const inner=new THREE.Mesh(new THREE.ConeGeometry(0.3,1.15,8,1,true),
+    new THREE.MeshBasicMaterial({color:0x3a3550,transparent:true,opacity:0.85,side:THREE.DoubleSide}));
+  inner.position.y=0.62;
+  /* рваный низ: три свисающих лоскута */
+  for(let i=0;i<3;i++){
+    const sh=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.42,5,1,true),cloakMat);
+    sh.position.set((i-1)*0.24,0.1,0); sh.rotation.x=Math.PI;
+    g.add(sh);
+  }
+  const hood=new THREE.Mesh(new THREE.SphereGeometry(0.22,9,8),
+    new THREE.MeshBasicMaterial({color:0x2a2438,transparent:true,opacity:0.94}));
+  hood.position.y=1.44; hood.scale.set(1,0.9,1);
+  const faceVoid=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8),
+    new THREE.MeshBasicMaterial({color:0x0a0812}));
+  faceVoid.position.set(0,1.4,0.1); faceVoid.scale.set(1,1.15,0.7);
   const eyeM=new THREE.MeshBasicMaterial({color:0x8affe8});
-  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6),eyeM); e1.position.set(-0.08,1.25,0.16);
-  const e2=e1.clone(); e2.position.x=0.08;
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),eyeM); e1.position.set(-0.085,1.42,0.19);
+  const e2=e1.clone(); e2.position.x=0.085;
+  /* светящийся знак на груди */
+  const sigil=new THREE.Mesh(new THREE.PlaneGeometry(0.2,0.26),
+    new THREE.MeshBasicMaterial({color:0x66e6c8,transparent:true,opacity:0.5}));
+  sigil.position.set(0,0.98,0.34);
+  /* ожерелье из костей */
+  const beadM=new THREE.MeshBasicMaterial({color:0xd8e8ff,transparent:true,opacity:0.85});
+  for(let i=0;i<4;i++){
+    const bead=new THREE.Mesh(new THREE.SphereGeometry(0.028,5,5),beadM);
+    bead.position.set(-0.12+i*0.08,1.24,0.19); g.add(bead);
+  }
   const clawM=new THREE.MeshBasicMaterial({color:0xd8e8ff,transparent:true,opacity:0.7});
-  const armGeo=new THREE.CylinderGeometry(0.035,0.02,0.36,5);
-  const armL=new THREE.Mesh(armGeo,clawM); armL.position.set(-0.28,0.88,0.18); armL.rotation.z=0.55;
-  const armR=new THREE.Mesh(armGeo,clawM); armR.position.set(0.28,0.88,0.18); armR.rotation.z=-0.55;
-  const c1=new THREE.Mesh(new THREE.ConeGeometry(0.032,0.13,5),clawM); c1.position.set(-0.42,0.75,0.25); c1.rotation.x=Math.PI;
-  const c2=c1.clone(); c2.position.x=0.42;
+  const armGeo=new THREE.CylinderGeometry(0.035,0.02,0.4,5);
+  const armL=new THREE.Mesh(armGeo,clawM); armL.position.set(-0.3,1.02,0.18); armL.rotation.z=0.55;
+  const armR=new THREE.Mesh(armGeo,clawM); armR.position.set(0.3,1.02,0.18); armR.rotation.z=-0.55;
+  const c1=new THREE.Mesh(new THREE.ConeGeometry(0.032,0.13,5),clawM); c1.position.set(-0.44,0.86,0.25); c1.rotation.x=Math.PI;
+  const c2=c1.clone(); c2.position.x=0.44;
   const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0x66e6c8,transparent:true,opacity:0.3,depthWrite:false,blending:THREE.AdditiveBlending}));
-  glow.scale.set(1.25,1.25,1); glow.position.y=0.9;
-  g.add(cloak,hood,e1,e2,armL,armR,c1,c2,glow);
+  glow.scale.set(1.3,1.3,1); glow.position.y=0.95;
+  g.add(cloak,inner,hood,faceVoid,e1,e2,sigil,armL,armR,c1,c2,glow);
   return g;
 }
 function makeKnight(){
-  /* РЖАВЫЙ КРЕСТОНОСЕЦ: эмблема-крест, наплечники, шлем с гребнем, щит */
+  /* РЖАВЫЙ КРЕСТОНОСЕЦ v11.2 (ремодель): нагрудник с сегментами, табард с крестом,
+     шарнирные ноги от бедра, рука-шарнир с мечом на гарде, щит с умбоном и заклёпками */
   const g=new THREE.Group();
   const steel=new THREE.MeshLambertMaterial({color:0xffffff,map:rustTex()});
   const dark =new THREE.MeshLambertMaterial({color:0x23252e});
+  /* корпус: торс + напульсник-сегменты + пояс */
   const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.9,0.45),steel); body.position.y=1.15;
-  const crossM=new THREE.MeshLambertMaterial({color:0x6a2020});
-  const cv1=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.04),crossM); cv1.position.set(0,1.2,0.25);
-  const cv2=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.12,0.04),crossM); cv2.position.set(0,1.28,0.25);
+  const chest=new THREE.Mesh(new THREE.BoxGeometry(0.74,0.3,0.5),steel); chest.position.set(0,1.38,0.03);
+  const waist=new THREE.Mesh(new THREE.BoxGeometry(0.72,0.14,0.48),dark); waist.position.y=0.76;
+  const tabard=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.55,0.03),new THREE.MeshLambertMaterial({color:0x6a2020}));
+  tabard.position.set(0,0.82,0.26);
+  const cv1=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.04),new THREE.MeshLambertMaterial({color:0xcaa64a})); cv1.position.set(0,1.2,0.29);
+  const cv2=cv1.clone(); cv2.scale.set(2.6,0.24,1); cv2.position.y=1.3;
+  /* наплечники с кантами */
   const pauldGeo=new THREE.SphereGeometry(0.19,8,8);
   const pauldL=new THREE.Mesh(pauldGeo,steel); pauldL.position.set(-0.42,1.56,0); pauldL.scale.set(1,0.72,1);
+  const rimL=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.022,6,12),dark); rimL.position.set(-0.42,1.58,0); rimL.rotation.x=Math.PI/2;
   const pauldR=new THREE.Mesh(pauldGeo,steel); pauldR.position.set(0.42,1.56,0); pauldR.scale.set(1,0.72,1);
+  const rimR=rimL.clone(); rimR.position.x=0.42;
+  /* шлем: забрало-щель, заклёпки, гребень */
   const helm=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.36,0.4),steel); helm.position.y=1.85;
   const helmTop=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.19,0.2,8),steel); helmTop.position.y=2.12;
   const visor=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.06,0.05),new THREE.MeshBasicMaterial({color:0xff2a2a})); visor.position.set(0,1.86,0.21);
+  const riv1=new THREE.Mesh(new THREE.SphereGeometry(0.022,5,5),dark); riv1.position.set(-0.14,1.98,0.21);
+  const riv2=riv1.clone(); riv2.position.x=0.14;
   const plume=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.32,0.34),new THREE.MeshLambertMaterial({color:0x8a1a1a})); plume.position.y=2.28;
-  /* щит на левой руке */
-  const shield=new THREE.Mesh(new THREE.CylinderGeometry(0.27,0.27,0.06,6),steel);
+  /* щит: диск + умбон + заклёпки по канту */
+  const shield=new THREE.Mesh(new THREE.CylinderGeometry(0.27,0.27,0.06,8),steel);
   shield.position.set(-0.52,1.12,0.16); shield.rotation.x=Math.PI/2;
-  const shieldRim=new THREE.Mesh(new THREE.CylinderGeometry(0.29,0.29,0.03,6),dark);
+  const shieldRim=new THREE.Mesh(new THREE.CylinderGeometry(0.29,0.29,0.03,8),dark);
   shieldRim.position.set(-0.52,1.12,0.16); shieldRim.rotation.x=Math.PI/2;
-  const legL=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.7,0.25),dark); legL.position.set(-0.18,0.35,0);
-  const legR=legL.clone(); legR.position.x=0.18;
-  const arm=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.6,0.16),steel); arm.position.set(0.45,1.2,0.1); arm.rotation.z=-0.5;
-  const sword=new THREE.Mesh(new THREE.BoxGeometry(0.07,1.1,0.12),new THREE.MeshLambertMaterial({color:0x9aa2b5})); sword.position.set(0.62,1.3,0.25); sword.rotation.z=-0.9;
-  g.add(body,cv1,cv2,pauldL,pauldR,helm,helmTop,visor,plume,shield,shieldRim,legL,legR,arm,sword);
-  g.userData.legs=[legL,legR]; // для анимации шага
-  g.userData.arm=arm; g.userData.sword=sword; g.userData.shield=shield; g.userData.body=body; // v11.1
+  const bossN=new THREE.Mesh(new THREE.SphereGeometry(0.07,7,7),new THREE.MeshLambertMaterial({color:0xcaa64a}));
+  bossN.position.set(-0.52,1.12,0.2);
+  for(let st=0;st<4;st++){
+    const a=st*Math.PI/2+Math.PI/4;
+    const stud=new THREE.Mesh(new THREE.SphereGeometry(0.025,5,5),dark);
+    stud.position.set(-0.52+Math.cos(a)*0.22,1.12+Math.sin(a)*0.22,0.2);
+    g.add(stud);
+  }
+  /* ноги-шарниры: вращаются от бедра (geometry смещена вниз) */
+  const mkLeg=(sx)=>{
+    const lg=new THREE.Group(); lg.position.set(sx,0.7,0);
+    const thigh=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.4,0.24),steel); thigh.position.y=-0.2;
+    const shin=new THREE.Mesh(new THREE.BoxGeometry(0.17,0.34,0.2),dark); shin.position.set(0,-0.52,0.02);
+    const boot=new THREE.Mesh(new THREE.BoxGeometry(0.19,0.1,0.3),dark); boot.position.set(0,-0.72,0.05);
+    lg.add(thigh,shin,boot); return lg;
+  };
+  const legL=mkLeg(-0.18), legR=mkLeg(0.18);
+  /* рука-шарнир с мечом: меч живёт на конце руки — замах двигает всё вместе */
+  const arm=new THREE.Group(); arm.position.set(0.45,1.5,0.1); arm.rotation.z=-0.5; // поза покоя (анимация стартует с неё)
+  const upper=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.34,0.15),steel); upper.position.y=-0.16;
+  const fore=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.3,0.13),dark); fore.position.y=-0.46;
+  const gaunt=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.12,0.16),steel); gaunt.position.y=-0.62;
+  const sword=new THREE.Group(); sword.position.y=-0.66;
+  const bladeB=new THREE.Mesh(new THREE.BoxGeometry(0.07,1.0,0.12),new THREE.MeshLambertMaterial({color:0x9aa2b5})); bladeB.position.y=0.62;
+  const tipB=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.18,4),new THREE.MeshLambertMaterial({color:0xb8beca})); tipB.position.y=1.2;
+  const guardB=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.05,0.16),new THREE.MeshLambertMaterial({color:0xcaa64a})); guardB.position.y=0.1;
+  const gripB=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.18,0.06),dark); gripB.position.y=0;
+  const pomB=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6),new THREE.MeshLambertMaterial({color:0xcaa64a})); pomB.position.y=-0.1;
+  sword.add(bladeB,tipB,guardB,gripB,pomB);
+  sword.rotation.z=-0.9;
+  arm.add(upper,fore,gaunt,sword);
+  g.add(body,chest,waist,tabard,cv1,cv2,pauldL,rimL,pauldR,rimR,helm,helmTop,visor,riv1,riv2,plume,
+        shield,shieldRim,bossN,legL,legR,arm);
+  g.userData.legs=[legL,legR];            // анимация шага
+  g.userData.arm=arm; g.userData.sword=sword; g.userData.shield=shield; g.userData.body=body; // v11.1/11.2
   return g;
 }
 function makeBossGhost(){
-  /* ВЛАДЫКА ЗАМКА: призрак в шипастой короне с лиловой аурой */
+  /* ВЛАДЫКА ЗАМКА v11.2 (ремодель): призрак в шипастой короне, огненные вихри-блуждающие огни */
   const g=makeGhost();
   const crownM=new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x5a4410,metalness:0.6,roughness:0.4});
   for(let i=0;i<6;i++){
@@ -1345,12 +1407,23 @@ function makeBossGhost(){
   }
   const ring=new THREE.Mesh(new THREE.TorusGeometry(0.14,0.03,6,12),crownM);
   ring.position.y=1.44; ring.rotation.x=Math.PI/2; g.add(ring);
+  /* v11.2: вихрь блуждающих огней — светятся в анимации (userData.wisps) */
+  const wispM=new THREE.MeshBasicMaterial({color:0xb060ff,transparent:true,opacity:0.8});
+  const wisps=[];
+  for(let i=0;i<5;i++){
+    const w=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6),wispM);
+    const a=i/5*Math.PI*2;
+    w.position.set(Math.cos(a)*0.5,1.3,Math.sin(a)*0.5);
+    w.userData.a=a; g.add(w); wisps.push(w);
+  }
   const aura=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0xb060ff,transparent:true,opacity:0.4,depthWrite:false,blending:THREE.AdditiveBlending}));
   aura.scale.set(2,2,1); aura.position.y=0.9; g.add(aura);
+  g.userData.wisps=wisps;
   return g;
 }
 function makeBossKnight(){
-  /* КОМАНДОР ТЬМЫ: чёрная сталь с золотыми кантами, рога на шлеме */
+  /* КОМАНДОР ТЬМЫ v11.2 (ремодель): чёрная сталь с золотыми кантами, рога,
+     пылающие красные глаза (0xff2a2a не затемняется traverse), рваный плащ */
   const g=makeKnight();
   const goldM=new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x5a4410,metalness:0.6,roughness:0.4});
   const hornGeo=new THREE.ConeGeometry(0.06,0.3,6);
@@ -1359,7 +1432,18 @@ function makeBossKnight(){
   const trimL=new THREE.Mesh(new THREE.TorusGeometry(0.19,0.025,6,12),goldM);
   trimL.position.set(-0.42,1.56,0); trimL.rotation.y=Math.PI/2;
   const trimR=trimL.clone(); trimR.position.x=0.42;
-  g.add(hL,hR,trimL,trimR);
+  /* пылающие глаза поверх забрала-щели */
+  const eyeM=new THREE.MeshBasicMaterial({color:0xff2a2a});
+  const beL=new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6),eyeM); beL.position.set(-0.09,1.87,0.22);
+  const beR=beL.clone(); beR.position.x=0.09;
+  /* рваный плащ за спиной (traverse затемнит до чёрного — так и задумано) */
+  const cape=new THREE.Mesh(new THREE.PlaneGeometry(0.72,1.05),
+    new THREE.MeshLambertMaterial({color:0x3a1a1a,side:THREE.DoubleSide}));
+  cape.position.set(0,1.05,-0.3); cape.rotation.x=0.12;
+  const capeFrac=new THREE.Mesh(new THREE.PlaneGeometry(0.24,0.3),
+    new THREE.MeshLambertMaterial({color:0x3a1a1a,side:THREE.DoubleSide}));
+  capeFrac.position.set(0.18,0.42,-0.33); capeFrac.rotation.x=0.2;
+  g.add(hL,hR,trimL,trimR,beL,beR,cape,capeFrac);
   g.traverse(o=>{ // затемнить сталь до почти чёрной (золото и визор не трогаем)
     if(o.isMesh&&o.material&&o.material.color){
       const h=o.material.color.getHex();
@@ -1409,7 +1493,15 @@ function makeKaver(){
   const tailSeg=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.05,0.4,6),dark);
   tailSeg.position.set(0,-0.2,-0.2); tailSeg.rotation.x=0.9;
   const tailTip=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6),dark); tailTip.position.set(0,-0.36,-0.38);
-  g.add(body,head,tuft,earL,earR,e1,e2,pp1,pp2,grin,t1,t2,armL,armR,clL,clR,tailSeg,tailTip);
+  /* v11.2: шипы на горбу + набедренная повязка */
+  for(let sp=0;sp<3;sp++){
+    const spike=new THREE.Mesh(new THREE.ConeGeometry(0.035,0.14,5),dark);
+    spike.position.set(0,0.3-sp*0.14,-0.16-sp*0.02); spike.rotation.x=-0.5;
+    g.add(spike);
+  }
+  const loincloth=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.2,0.04),new THREE.MeshLambertMaterial({color:0x5a3a20}));
+  loincloth.position.set(0,-0.2,0.14);
+  g.add(body,head,tuft,earL,earR,e1,e2,pp1,pp2,grin,t1,t2,armL,armR,clL,clR,tailSeg,tailTip,loincloth);
   g.userData.ears=[earL,earR]; g.userData.tail=[tailSeg,tailTip]; // v11.1: для анимаций
   return g;
 }
@@ -1443,12 +1535,22 @@ function makePilgor(){
   const bell=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x4a3a08,metalness:0.5,roughness:0.5}));
   bell.position.set(0,0.9,0.56); bell.scale.y=1.2;
   const tail=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),wool); tail.position.set(0,0.82,-0.48);
-  const legG=new THREE.BoxGeometry(0.09,0.5,0.09);
-  const l1=new THREE.Mesh(legG,dark); l1.position.set(-0.16,0.25,0.28);
-  const l2=l1.clone(); l2.position.x=0.16;
-  const l3=l1.clone(); l3.position.z=-0.28;
-  const l4=l3.clone(); l4.position.x=0.16;
-  g.add(body,neck,head,hL,hR,beard,tongue,e1,e2,p1,p2,collar,bell,tail,l1,l2,l3,l4);
+  /* злые брови нависают над глазами */
+  const browG=new THREE.BoxGeometry(0.1,0.035,0.06);
+  const browL=new THREE.Mesh(browG,dark); browL.position.set(-0.12,1.22,0.79); browL.rotation.z=0.35;
+  const browR=new THREE.Mesh(browG,dark); browR.position.set(0.12,1.22,0.79); browR.rotation.z=-0.35;
+  /* гребень шерсти вдоль спины */
+  const ridge=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.08,0.5),wool); ridge.position.set(0,1.02,-0.05);
+  /* ноги-шарниры с копытами: вращаются от бедра */
+  const mkGoatLeg=(sx,sz)=>{
+    const lg=new THREE.Group(); lg.position.set(sx,0.5,sz);
+    const legB=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.4,0.09),dark); legB.position.y=-0.2;
+    const hoof=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.065,0.12,6),new THREE.MeshLambertMaterial({color:0x2a2420}));
+    hoof.position.y=-0.44;
+    lg.add(legB,hoof); return lg;
+  };
+  const l1=mkGoatLeg(-0.16,0.28), l2=mkGoatLeg(0.16,0.28), l3=mkGoatLeg(-0.16,-0.28), l4=mkGoatLeg(0.16,-0.28);
+  g.add(body,neck,head,hL,hR,beard,tongue,e1,e2,p1,p2,collar,bell,tail,browL,browR,ridge,l1,l2,l3,l4);
   g.userData.legs=[l1,l2,l3,l4];
   return g;
 }
@@ -1922,33 +2024,78 @@ weaponHolder.rotation.set(0.35,-0.25,0.25);
 camera.add(weaponHolder);
 const weaponMeshes={};
 {
-  /* клинок */
-  const blade=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.6,0.1),new THREE.MeshBasicMaterial({color:0xcfd6e4}));
-  blade.position.y=0.32;
-  const guard=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.04,0.13),new THREE.MeshBasicMaterial({color:0x9a7a2e}));
-  const grip=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.18,0.055),new THREE.MeshBasicMaterial({color:0x4a3520}));
-  grip.position.y=-0.1;
-  const g1=new THREE.Group(); g1.add(blade,guard,grip); weaponMeshes.blade=g1;
-  /* секира */
+  /* v11.2: перчатка-рука — общий элемент, клонируется в каждый ствол */
+  const gauntlet=(()=> {
+    const h=new THREE.Group();
+    const gm=new THREE.MeshLambertMaterial({color:0x3a3f4e});
+    const palm=new THREE.Mesh(new THREE.BoxGeometry(0.085,0.09,0.1),gm);
+    const fingers=new THREE.Mesh(new THREE.BoxGeometry(0.085,0.075,0.035),new THREE.MeshLambertMaterial({color:0x2e323e}));
+    fingers.position.z=-0.065;
+    const thumb=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.075,0.035),new THREE.MeshLambertMaterial({color:0x2e323e}));
+    thumb.position.set(-0.05,-0.005,-0.04); thumb.rotation.y=0.5;
+    const cuff=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.062,0.07,8),new THREE.MeshLambertMaterial({color:0x6a4a26}));
+    cuff.position.y=-0.075; cuff.rotation.x=Math.PI/2;
+    h.add(palm,fingers,thumb,cuff);
+    return h;
+  })();
+  /* клинок: сужающееся остриё, дол, самоцветная гарда, оплётка рукояти, навершие */
+  const g1=new THREE.Group();
+  const bladeB=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.52,0.1),new THREE.MeshBasicMaterial({color:0xcfd6e4}));
+  bladeB.position.y=0.34;
+  const fuller=new THREE.Mesh(new THREE.BoxGeometry(0.012,0.44,0.104),new THREE.MeshBasicMaterial({color:0x9aa6ba}));
+  fuller.position.y=0.36;
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.043,0.14,4),new THREE.MeshBasicMaterial({color:0xdde2ec}));
+  tip.rotation.y=Math.PI/4; tip.position.y=0.66;
+  const ricasso=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.06,0.11),new THREE.MeshBasicMaterial({color:0xb8beca}));
+  ricasso.position.y=0.05;
+  const guard=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.035,0.13),new THREE.MeshBasicMaterial({color:0x9a7a2e}));
+  const gem=new THREE.Mesh(new THREE.OctahedronGeometry(0.028),new THREE.MeshBasicMaterial({color:0x8a4ae0}));
+  gem.position.set(0,0.02,0.075);
+  const gripB=new THREE.Mesh(new THREE.CylinderGeometry(0.026,0.024,0.19,7),new THREE.MeshBasicMaterial({color:0x4a3520}));
+  gripB.position.y=-0.11;
+  const wrapB=new THREE.Mesh(new THREE.TorusGeometry(0.028,0.008,5,10),new THREE.MeshBasicMaterial({color:0x2a1e12}));
+  wrapB.position.y=-0.07; wrapB.rotation.y=Math.PI/2;
+  const wrapB2=wrapB.clone(); wrapB2.position.y=-0.14; wrapB2.rotation.y=0;
+  const pommel=new THREE.Mesh(new THREE.SphereGeometry(0.032,7,7),new THREE.MeshBasicMaterial({color:0x9a7a2e}));
+  pommel.position.y=-0.215;
+  const hand1=gauntlet.clone(); hand1.position.y=-0.155; hand1.rotation.x=0.5;
+  g1.add(bladeB,fuller,tip,ricasso,guard,gem,gripB,wrapB,wrapB2,pommel,hand1); weaponMeshes.blade=g1;
+  /* секира: обоюдоострая голова, кожаная обмотка рукояти */
   const axeG=new THREE.Group();
   const hndl=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.038,0.72,8),new THREE.MeshBasicMaterial({color:0x4a3520}));
   hndl.position.y=0.24;
+  const leather=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.16,8),new THREE.MeshBasicMaterial({color:0x5a3a22}));
+  leather.position.y=-0.04;
+  const leather2=new THREE.Mesh(new THREE.TorusGeometry(0.042,0.007,5,10),new THREE.MeshBasicMaterial({color:0x3a2616}));
+  leather2.position.y=-0.1; leather2.rotation.y=Math.PI/2;
   const axHead=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.22,0.26),new THREE.MeshBasicMaterial({color:0x9aa2b5}));
   axHead.position.set(0,0.56,0.1);
+  const axHeadB=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.18,0.2),new THREE.MeshBasicMaterial({color:0x9aa2b5}));
+  axHeadB.position.set(0,0.56,-0.08);
   const axEdge=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.28,0.05),new THREE.MeshBasicMaterial({color:0xe8ecf4}));
   axEdge.position.set(0,0.56,0.24);
+  const axEdgeB=new THREE.Mesh(new THREE.BoxGeometry(0.045,0.22,0.05),new THREE.MeshBasicMaterial({color:0xe8ecf4}));
+  axEdgeB.position.set(0,0.56,-0.2);
   const backSpike=new THREE.Mesh(new THREE.ConeGeometry(0.04,0.14,5),new THREE.MeshBasicMaterial({color:0xb8beca}));
-  backSpike.rotation.x=Math.PI/2; backSpike.position.set(0,0.56,-0.14);
-  axeG.add(hndl,axHead,axEdge,backSpike); weaponMeshes.axe=axeG;
-  /* копьё */
+  backSpike.rotation.x=Math.PI/2; backSpike.position.set(0,0.72,0);
+  const hand2=gauntlet.clone(); hand2.position.y=0.03; hand2.rotation.x=0.5;
+  axeG.add(hndl,leather,leather2,axHead,axHeadB,axEdge,axEdgeB,backSpike,hand2); weaponMeshes.axe=axeG;
+  /* копьё: листовидное остриё, красная кисть, витой обмот */
   const spG=new THREE.Group();
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.032,1.15,8),new THREE.MeshBasicMaterial({color:0x5a4426}));
   shaft.position.y=0.2;
-  const wrap=new THREE.Mesh(new THREE.CylinderGeometry(0.033,0.033,0.14,8),new THREE.MeshBasicMaterial({color:0x8a2020}));
-  wrap.position.y=-0.28;
-  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.24,8),new THREE.MeshBasicMaterial({color:0xd8dce6}));
-  tip.position.y=0.86;
-  spG.add(shaft,wrap,tip); weaponMeshes.spear=spG;
+  const wrapS=new THREE.Mesh(new THREE.CylinderGeometry(0.033,0.033,0.14,8),new THREE.MeshBasicMaterial({color:0x8a2020}));
+  wrapS.position.y=-0.28;
+  const collarS=new THREE.Mesh(new THREE.CylinderGeometry(0.036,0.036,0.03,8),new THREE.MeshBasicMaterial({color:0x9a7a2e}));
+  collarS.position.y=0.72;
+  const socketS=new THREE.Mesh(new THREE.ConeGeometry(0.045,0.1,6),new THREE.MeshBasicMaterial({color:0xb8beca}));
+  socketS.position.y=0.78;
+  const leaf=new THREE.Mesh(new THREE.SphereGeometry(0.055,7,8),new THREE.MeshBasicMaterial({color:0xd8dce6}));
+  leaf.scale.set(0.5,1.8,1); leaf.position.y=0.94;
+  const tassel=new THREE.Mesh(new THREE.ConeGeometry(0.045,0.12,6),new THREE.MeshBasicMaterial({color:0xc23a3a}));
+  tassel.rotation.x=Math.PI; tassel.position.y=0.66;
+  const hand3=gauntlet.clone(); hand3.position.y=-0.24; hand3.rotation.x=0.5;
+  spG.add(shaft,wrapS,collarS,socketS,leaf,tassel,hand3); weaponMeshes.spear=spG;
   weaponHolder.add(g1,axeG,spG);
 }
 function updateWeaponView(){
@@ -2754,6 +2901,11 @@ function update(dt){
       en.mesh.position.y=1.5+Math.sin(en.t*2.5)*0.15;
       en.mesh.rotation.z=Math.sin(en.t*1.8)*0.10;
       en.mesh.rotation.x=Math.sin(en.t*1.3)*0.06;
+      /* v11.2: огни Владыки кружат вокруг него */
+      if(ud.wisps)for(let wi=0;wi<ud.wisps.length;wi++){
+        const w=ud.wisps[wi], a=w.userData.a+en.t*1.6;
+        w.position.set(Math.cos(a)*0.5,1.3+Math.sin(en.t*2.2+wi)*0.35,Math.sin(a)*0.5);
+      }
     }else{
       en.mesh.position.y=0;
       if(en.kind==='pilgor'&&en.state!=='dash'&&en.state!=='stun')en.mesh.rotation.x=0;
