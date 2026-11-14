@@ -142,6 +142,7 @@
 </div>
 <div id="vignette"></div>
 <div id="poisveil"></div>
+<div id="floorfx" style="position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:8;transition:opacity .15s"></div>
 <div id="rotHint">↻ Поверни телефон горизонтально — так удобнее</div>
 
 <div class="overlay" id="loadOv">
@@ -155,12 +156,13 @@
 
 <div class="overlay hidden" id="startOv">
   <h1>🏰 ЗАМОК 100 ДВЕРЕЙ</h1>
-  <p>Ты заперт в древнем замке: <b>100 дверей открываются строго по порядку</b> — следи за подсказкой сверху.
-     Ищи <b>золотой ключ</b>, хлеб, воду и аптечки, а в конце ждёт тронный зал и <b>зелёный выход</b>.
+  <p>Ты заперт в древнем замке: <b>200 дверей на двух этажах — строго по порядку</b> — следи за подсказкой сверху.
+     Ищи <b>золотой</b> и <b>серебряный ключи</b>, хлеб, воду и аптечки, открой <b>Великую лестницу</b>
+     после 100-й двери и найди <b>синий финал</b> на глубине Готического крыла.
      Призраки, рыцари, <b>пилгоры</b>, Каверга с приказами и два босса будут мешать.<br>
      Убивай врагов — за 🪙 <b>пильгорцы</b> Мопс и Добрый Пилгор продают еду, зелья и оружие
      (<b>M</b> — лавка, <b>I</b> — инвентарь). Покупки <b>сохраняются</b> между заходами.
-     За полное прохождение — 🪙 <b>+100</b>!
+     За полное прохождение — 🪙 <b>+200</b>!
      <span style="color:#ffb0d0">Легендарного МОПСА нельзя купить — только тайная комната (1 к 100 000).</span></p>
   <div class="statstrip">
     <span>🪙 Пильгорцы: <b id="mCoins">0</b></span>
@@ -310,10 +312,19 @@ loadStep(8,'Грузим движок…');
 /* v11: ЗАМОК-АНФИЛАДА — больше не лабиринт-вразброс. 101 зал стоит цепочкой
    «змейкой», и дверь №k соединяет зал k-1 с залом k: идёшь СТРОГО из комнаты
    в комнату, по номерам, до финального тронного зала и выхода */
-const G=45, S=3.2, WALL_H=3.6, OR=-G*S/2;
+const G=90, S=3.2, WALL_H=3.6, OR=-G*S/2;
+/* v12: ДВА ЭТАЖА в одной сетке. Этаж 1 — X 0..44 (залы 0-100, двери 1-100),
+   этаж 2 — X 45..89 (залы 101-201, двери 101-200). Между ними глухая стена X=44/45,
+   путь наверх — только ВЕЛИКАЯ ЛЕСТНИЦА (телепорт ±45 ячеек по X). */
+const FLOOR2=45;
+const FLOOR2_W=FLOOR2*S;                    // 144 м — сдвиг телепорта
+const isFloor2=x=>x-OR>=FLOOR2*S;           // этаж точки (метры)
+const cellFloor2=x=>x>=FLOOR2;              // этаж ячейки
 const wx=g=>OR+(g+0.5)*S;
 const grid=Array.from({length:G},()=>Array(G).fill(1)); // grid[y][x]
 const openings=[];
+/* v12: двери второго этажа (101-200) */
+const openings2=[];
 
 /* ---------- АНФИЛАДА: 101 зал змейкой, 100 дверей между ними ---------- */
 const rooms=[];
@@ -339,10 +350,37 @@ const rooms=[];
     grid[gy][gx]=0; openings.push([gx,gy]);
   }
 })();
+/* ---------- v12: ЭТАЖ 2 — Готическое крыло: залы 101-201, двери 101-200 ----------
+   Та же змейка, сдвинутая на FLOOR2 ячеек по X: телепорт лестницы — чистый сдвиг,
+   геометрия обоих этажей идентична, коллизии/los/двери работают без изменений */
+(function makeRooms2(){
+  const TYPES=['hall','storage','crypt','fountain','library','arsenal','chapel','treasury',
+               'throne','prison','forge','alchemy','observatory','banquet','cellar','gallery',
+               'garden','ossuary','music','maproom','belltower','baths','hero'];
+  const PER=10, total=101, base=101; // залы 101..201: №101 — старт этажа, №201 — финал
+  for(let i=0;i<total;i++){
+    const row=(i/PER)|0, piv=i%PER;
+    const col=(row%2===0)?piv:PER-1-piv;
+    const x0=1+FLOOR2+col*4, y0=1+row*4;
+    for(let y=y0;y<y0+3;y++)for(let x=x0;x<x0+3;x++)grid[y][x]=0;
+    const type=i===0?'hall':(i===total-1?'throne':TYPES[(i-1)%TYPES.length]);
+    rooms.push({x0,y0,w:3,h:3,type,idx:base+i,floor:2});
+  }
+  for(let i=0;i<total-1;i++){
+    const a=rooms[base+i], b=rooms[base+i+1];
+    const dx=a.y0===b.y0?(b.x0>a.x0?3:-1):1;
+    const dy=a.y0===b.y0?1:3;
+    const gx=a.x0+dx, gy=a.y0+dy;
+    grid[gy][gx]=0; openings2.push([gx,gy]);
+  }
+})();
 
 /* золотой ключ ждёт в глубине замка (залы ~65-76), а не где попало */
 const keyRoom=rooms[64+((Math.random()*12)|0)];
 const KEY_SPOT=[keyRoom.x0+1,keyRoom.y0+1];
+/* v12: серебряный ключ — глубина второго этажа (залы ~165-176) */
+const keyRoom2=rooms[164+((Math.random()*12)|0)];
+const KEY2_SPOT=[keyRoom2.x0+1,keyRoom2.y0+1];
 
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;
 };
@@ -416,6 +454,8 @@ function woodTex(){
 const doorMatNormal=new THREE.MeshLambertMaterial({map:woodTex()});
 const doorMatBlood =new THREE.MeshLambertMaterial({map:woodTex(),color:0xb07060});
 const doorMatGold  =new THREE.MeshLambertMaterial({map:woodTex(),color:0xd8b050}); // тайники за каждой 10-й
+/* v12: двери Готического крыла — тёмное дерево с синевой */
+const doorMat2     =new THREE.MeshLambertMaterial({map:woodTex(),color:0x6a78b8});
 
 /* ================== СЦЕНА ================== */
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -587,6 +627,10 @@ let mopsSpot=null; /* v10: координаты тайной комнаты мо
     forge:0x6a4a3a,alchemy:0x4a6a4a,observatory:0x3a4668,banquet:0x7a5a3a,cellar:0x5a4634,
     gallery:0x6a6a7a,garden:0x3f5a3f,ossuary:0x6a6a62,music:0x4a3a5a,maproom:0x6a5a44,
     belltower:0x5a5648,baths:0x4a7a7a,hero:0x6a6a72};
+  /* v12: палитра этажа 2 — холодный фиолетово-серый камень Готического крыла */
+  const shift=(c,dr,dg,db)=>c+((dr<<16)|(dg<<8)|db);
+  const PAL2={}; for(const k in PAL)PAL2[k]=shift(PAL[k],-14,4,26); // в холод
+  PAL2.throne=0x2a2a4a; PAL2.hall=0x4a4468; PAL2.observatory=0x2a3468;
   const roomFloorTex=stoneFloorTex(); roomFloorTex.repeat.set(3,3);
   /* бюджет точечных источников: на телефоне больше 8 — лаги; остальным хватает свечений */
   let lightBudget=8;
@@ -597,11 +641,12 @@ let mopsSpot=null; /* v10: координаты тайной комнаты мо
   };
   const torchWood=new THREE.MeshLambertMaterial({color:0x3a2c1a});
   const torchFire=new THREE.MeshBasicMaterial({color:0xff9a33});
+  const torchFire2=new THREE.MeshBasicMaterial({color:0xa86aff}); // v12: лиловое пламя этажа 2
   for(const r of rooms){
     const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
-    /* свой пол зала */
+    /* свой пол зала (v12: этаж 2 — готическая палитра) */
     const fl2=new THREE.Mesh(new THREE.PlaneGeometry(r.w*S-0.25,r.h*S-0.25),
-      new THREE.MeshLambertMaterial({color:PAL[r.type]||0x6a6a72,map:roomFloorTex}));
+      new THREE.MeshLambertMaterial({color:(r.floor===2?PAL2:PAL)[r.type]||0x6a6a72,map:roomFloorTex}));
     fl2.rotation.x=-Math.PI/2; fl2.position.set(cx,0.015,cz); scene.add(fl2);
     /* настенная пара факелов — в каждом 3-м зале (на телефоне — в каждом 4-м) */
     if(r.idx%(isTouch?4:3)===0){
@@ -610,7 +655,7 @@ let mopsSpot=null; /* v10: координаты тайной комнаты мо
       for(const [ddx,ddy] of sides.slice(0,2)){
         const px2=cx+ddx*(S*1.5-0.14), pz2=cz+ddy*(S*1.5-0.14);
         const br=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.3,0.1),torchWood); br.position.set(px2,1.6,pz2); scene.add(br);
-        const flm=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.5,0.14),torchFire); flm.position.set(px2,1.95,pz2); scene.add(flm);
+        const flm=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.5,0.14),r.floor===2?torchFire2:torchFire); flm.position.set(px2,1.95,pz2); scene.add(flm);
         const gl2=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.75,depthWrite:false,blending:THREE.AdditiveBlending}));
         gl2.scale.set(1.7,1.7,1); gl2.position.set(px2-ddx*0.15,2.05,pz2-ddy*0.15); scene.add(gl2);
       }
@@ -958,7 +1003,7 @@ const inRoom=(x,y)=>rooms.some(r=>x>=r.x0&&x<r.x0+r.w&&y>=r.y0&&y<r.y0+r.h);
 /* v11: дверь №k стоит РОВНО между залом k-1 и залом k (порядок анфилады).
    В зал k можно попасть только через дверь k — обойти никак: стены глухие,
    значит «правильный порядок» гарантирован самой геометрией замка */
-const doorDefs=openings.slice();      // ровно 100, уже в порядке цепочки
+const doorDefs=openings.concat(openings2);   // ровно 200, уже в порядке цепочки
 loadStep(28,'Строим замок…'); await tick();
 
 function plaqueTex(n,reward){
@@ -996,7 +1041,8 @@ doorDefs.forEach(([gx,gy],idx)=>{
   const trap=trapped?(r=>r<0.4?'spike':r<0.7?'darts':'gas')(Math.random()):null;
   const bloodTrim=trapped&&Math.random()<0.5;
 
-  const mat=reward?doorMatGold:(bloodTrim?doorMatBlood:doorMatNormal);
+  const f2=idx>=100; // v12: этаж 2 — свои двери
+  const mat=reward?doorMatGold:(bloodTrim?doorMatBlood:(f2?doorMat2:doorMatNormal));
   const slab=new THREE.Mesh(new THREE.BoxGeometry(alongX?0.22:S*0.92, 3.3, alongX?S*0.92:0.22), mat);
   const plaque=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.6),
     new THREE.MeshBasicMaterial({map:plaqueTex(num,reward),side:THREE.DoubleSide}));
@@ -1034,7 +1080,7 @@ const fakeDoors=[];
     const horiz=dy!==0; // дверь в плоскости x (стена север/юг)
     const slab=new THREE.Mesh(new THREE.BoxGeometry(horiz?2.9:0.14, 3.3, horiz?0.14:2.9), mat);
     slab.position.set(px,1.65,pz);
-    const num=1+((Math.random()*100)|0);
+    const num=(x>=FLOOR2?101:1)+((Math.random()*100)|0); // v12: этаж — свои номера
     const plaque=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.6),
       new THREE.MeshBasicMaterial({map:plaqueTex(num),side:THREE.DoubleSide}));
     // повернуть табличку в коридор
@@ -1097,7 +1143,8 @@ function makeGas(gx,gy){
 
 /* ================== ПРЕДМЕТЫ ================== */
 function placeItems(){
-  const cells=shuffle(floorCells.filter(([x,y])=>(x>4||y>4)&&!doorAt.has(x+'_'+y)));
+  const cells=shuffle(floorCells.filter(([x,y])=>(x>4&&x<FLOOR2||x>FLOOR2+4||y>4)&&!doorAt.has(x+'_'+y)));
+  const cells2=shuffle(floorCells.filter(([x,y])=>x>=FLOOR2+1&&!doorAt.has(x+'_'+y))); // v12: этаж 2
   let ci=0;
   const breadMat=new THREE.MeshLambertMaterial({color:0xb5813f});
   const waterMat=new THREE.MeshLambertMaterial({color:0x2f9fe0});
@@ -1122,6 +1169,15 @@ function placeItems(){
   const teeth=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.05,0.05),kMat); teeth.position.set(0.05,-0.4,0);
   kg.add(ring,shaft,teeth); kg.position.set(wx(keyCell[0])+0.5,0.8,wx(keyCell[1])+0.5);
   scene.add(kg); items.push({mesh:kg,type:'key'});
+  /* v12: СЕРЕБРЯНЫЙ КЛЮЧ — глубина второго этажа, открывает врата финала наверху */
+  const k2Cell=KEY2_SPOT;
+  const k2Mat=new THREE.MeshStandardMaterial({color:0x9ab8e8,emissive:0x2a4a8a,metalness:0.7,roughness:0.3});
+  const ring2=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.04,8,16),k2Mat);
+  const shaft2=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.4,0.05),k2Mat); shaft2.position.y=-0.25;
+  const teeth2=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.05,0.05),k2Mat); teeth2.position.set(-0.05,-0.4,0);
+  const kg2=new THREE.Group(); kg2.add(ring2,shaft2,teeth2);
+  kg2.position.set(wx(k2Cell[0])+0.5,0.8,wx(k2Cell[1])+0.5);
+  scene.add(kg2); items.push({mesh:kg2,type:'key2'});
   // гарантированный лут в комнатах
   for(const r of rooms){
     const cx=wx(r.x0+(r.w-1)/2), cz=wx(r.y0+(r.h-1)/2);
@@ -1142,6 +1198,25 @@ function placeItems(){
   // аптечки
   for(let i=0;i<8;i++){
     const [x,y]=cells[ci++];
+    dropMed(wx(x)+0.5,wx(y)+0.5);
+  }
+  /* v12: дополнительные припасы на ВТОРОМ этаже (получаса пути — голодным не остаться) */
+  const breadMat2=new THREE.MeshLambertMaterial({color:0xb5813f});
+  const waterMat2=new THREE.MeshLambertMaterial({color:0x2f9fe0});
+  for(let i=0;i<10;i++){
+    const [x,y]=cells2[ci%cells2.length]; ci++;
+    const m=new THREE.Mesh(new THREE.CapsuleGeometry(0.14,0.22,4,8),breadMat2);
+    m.rotation.z=Math.PI/2; m.position.set(wx(x)+0.5,0.25,wx(y)+0.5);
+    scene.add(m); items.push({mesh:m,type:'food'});
+  }
+  for(let i=0;i<10;i++){
+    const [x,y]=cells2[ci%cells2.length]; ci++;
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.32,10),waterMat2);
+    m.position.set(wx(x)+0.5,0.22,wx(y)+0.5);
+    scene.add(m); items.push({mesh:m,type:'water'});
+  }
+  for(let i=0;i<6;i++){
+    const [x,y]=cells2[ci%cells2.length]; ci++;
     dropMed(wx(x)+0.5,wx(y)+0.5);
   }
 }
@@ -1177,49 +1252,88 @@ function dropCoins(px,pz,lo,hi){
 }placeItems();
 loadStep(88,'Выпускаем монстров…'); await tick();
 
-/* ---------- выход ---------- */
-/* v11: врата стоят в глубине финального тронного зала (зал №101 анфилады) */
+/* ---------- выход: v12 — это теперь ВЕЛИКАЯ ЛЕСТНИЦА на второй этаж ---------- */
+/* v11: врата стоят в глубине финального тронного зала (зал №101 анфилады).
+   v12: после 100 дверей и золотого ключа арка ведёт НЕ на свободу, а НАВЕРХ */
 const EXIT=[rooms[100].x0+1,rooms[100].y0+1];
 const exitPos=new THREE.Vector3(wx(EXIT[0]),0,wx(EXIT[1]));
-let exitGate;
-{
+/* v12: врата спуска (зал 110 наверху) и врата финала (зал 201, глубина этажа 2) */
+const EXIT2=[rooms[201].x0+1,rooms[201].y0+1];
+const exitPos2=new THREE.Vector3(wx(EXIT2[0]),0,wx(EXIT2[1]));
+/* v12: спуск — в зале 101 (старт этажа 2); подъём — в тронном зале 100. НЕ зеркальные точки:
+   зеркальная пара зала 100 — финальный зал 201, а на старте этажа игрок не должен стоять у финала */
+const stairsPos=new THREE.Vector3(wx(rooms[101].x0+1),0,wx(rooms[101].y0+1));
+function buildGate(px,pz,eyeCol,fireCol){
   const archMat=new THREE.MeshLambertMaterial({color:0x2a2d38});
-  const p1=new THREE.Mesh(new THREE.BoxGeometry(0.4,3.8,0.4),archMat); p1.position.set(exitPos.x-1,1.9,exitPos.z);
-  const p2=p1.clone(); p2.position.x=exitPos.x+1;
-  const top=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.4,0.5),archMat); top.position.set(exitPos.x,3.8,exitPos.z);
+  const p1=new THREE.Mesh(new THREE.BoxGeometry(0.4,3.8,0.4),archMat); p1.position.set(px-1,1.9,pz);
+  const p2=p1.clone(); p2.position.x=px+1;
+  const top=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.4,0.5),archMat); top.position.set(px,3.8,pz);
   const gate=new THREE.Mesh(new THREE.BoxGeometry(1.9,3.4,0.2),
     new THREE.MeshLambertMaterial({color:0x24304a,emissive:0x0a1a3a}));
-  gate.position.set(exitPos.x,1.7,exitPos.z);
-  exitGate=gate;
-  /* v10: РЕДИЗАЙН ВРАТ — череп-страж над аркой + кованые брызги + факелы */
+  gate.position.set(px,1.7,pz);
   const skull=new THREE.Mesh(new THREE.SphereGeometry(0.36,10,10),new THREE.MeshLambertMaterial({color:0xd8d2c0}));
-  skull.position.set(exitPos.x,4.25,exitPos.z); skull.scale.set(1,0.85,0.9);
+  skull.position.set(px,4.25,pz); skull.scale.set(1,0.85,0.9);
   const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.12,0.24),new THREE.MeshLambertMaterial({color:0xc8c2b0}));
-  jaw.position.set(exitPos.x,4.02,exitPos.z-0.04);
-  const eyeM=new THREE.MeshBasicMaterial({color:0x39e07a});
-  const se1=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),eyeM); se1.position.set(exitPos.x-0.13,4.32,exitPos.z-0.3);
-  const se2=se1.clone(); se2.position.x=exitPos.x+0.13;
-  for(const [bx,gl] of [[exitPos.x-1,0xff9040],[exitPos.x+1,0xff9040]]){
+  jaw.position.set(px,4.02,pz-0.04);
+  const eyeM=new THREE.MeshBasicMaterial({color:eyeCol});
+  const se1=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),eyeM); se1.position.set(px-0.13,4.32,pz-0.3);
+  const se2=se1.clone(); se2.position.x=px+0.13;
+  for(const bx of [px-1,px+1]){
     const bowl=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.26,0.35,8),new THREE.MeshLambertMaterial({color:0x3a2f26}));
-    bowl.position.set(bx,3.6,exitPos.z-0.15); scene.add(bowl);
-    const fl=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8),new THREE.MeshBasicMaterial({color:gl}));
-    fl.position.set(bx,3.85,exitPos.z-0.15); scene.add(fl);
+    bowl.position.set(bx,3.6,pz-0.15); scene.add(bowl);
+    const fl=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8),new THREE.MeshBasicMaterial({color:fireCol}));
+    fl.position.set(bx,3.85,pz-0.15); scene.add(fl);
     const bgl=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,transparent:true,opacity:0.8,depthWrite:false,blending:THREE.AdditiveBlending}));
-    bgl.scale.set(1.6,1.6,1); bgl.position.set(bx,3.9,exitPos.z-0.15); scene.add(bgl);
+    bgl.scale.set(1.6,1.6,1); bgl.position.set(bx,3.9,pz-0.15); scene.add(bgl);
   }
   scene.add(p1,p2,top,gate,skull,jaw,se1,se2);
+  return gate;
 }
+/* за аркой — чёрный проём со ступенями, уходящими вверх (вниз для спуска) */
+function buildStairs(px,pz,up){
+  const darkM=new THREE.MeshBasicMaterial({color:0x05050a,side:THREE.DoubleSide});
+  const voidP=new THREE.Mesh(new THREE.PlaneGeometry(2.2,4.6),darkM);
+  voidP.position.set(px,2.3,pz+(up?-0.95:0.95));
+  voidP.rotation.y=Math.PI/2;
+  const stepM=new THREE.MeshLambertMaterial({color:0x3a3a44});
+  for(let i=0;i<6;i++){
+    const st=new THREE.Mesh(new THREE.BoxGeometry(1.8,0.16,0.3),stepM);
+    st.position.set(px,0.28+i*0.55,pz+(up?-(0.4+i*0.22):(0.4+i*0.22)));
+    scene.add(st);
+  }
+  scene.add(voidP);
+}
+let exitGate=buildGate(exitPos.x,exitPos.z,0xffd75e,0xffb040); // глаза золотые — лестница
+buildStairs(exitPos.x,exitPos.z,true);
+buildGate(stairsPos.x,stairsPos.z,0xffd75e,0xffb040);          // спуск наверху
+buildStairs(stairsPos.x,stairsPos.z,false);
+let exitGate2=buildGate(exitPos2.x,exitPos2.z,0x5ab0ff,0x50a0ff); // финал наверху — синие врата
 const exitBeam=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,40,12,1,true),
-  new THREE.MeshBasicMaterial({color:0x39e07a,transparent:true,opacity:0.25,side:THREE.DoubleSide}));
+  new THREE.MeshBasicMaterial({color:0xffd75e,transparent:true,opacity:0.25,side:THREE.DoubleSide}));
 exitBeam.position.set(exitPos.x,20,exitPos.z); exitBeam.visible=false; scene.add(exitBeam);
+const exitBeam2=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,40,12,1,true),
+  new THREE.MeshBasicMaterial({color:0x5ab0ff,transparent:true,opacity:0.25,side:THREE.DoubleSide}));
+exitBeam2.position.set(exitPos2.x,20,exitPos2.z); exitBeam2.visible=false; scene.add(exitBeam2);
+/* v12: телепорт по Великой лестнице — чётко в центр нужного зала */
+let floorFxT=0, stairCd=0; // затемнение и кулдаун против пинг-понга триггеров
+function climbStairs(down){
+  sDoor(); beep(120,240,0.6,'sine',0.14);
+  floorFxT=0.55; stairCd=1.4;
+  player.pos.x=down?exitPos.x:stairsPos.x;
+  player.pos.z=down?exitPos.z:stairsPos.z;
+  player.pos.y=1.6; player.vy=0;
+  lastSafe.x=player.pos.x; lastSafe.z=player.pos.z; lastSafe.t=elapsed; // анти-софтлок — на новом этаже
+  if(down)msg('🪜 Ты спустился на первый этаж замка.','#c8b890');
+  else msg('🪜 ВЕЛИКАЯ ЛЕСТНИЦА! Ты наверху — Готическое крыло: двери №101–200. Наверху иная тьма...','#c8b8ff');
+}
 
 /* ================== БЕЗОПАСНЫЕ ЗОНЫ ================== */
 const safeZones=[];
 const zoneCells=new Set();
 let playerInSafe=false;
 {
-  /* v11: островки безопасности — каждый 12-й зал анфилады */
-  for(const ri of [12,24,36,48,60,72,84,96]){
+  /* v11: островки безопасности — каждый 12-й зал анфилады; v12: + второй этаж */
+  for(const ri of [12,24,36,48,60,72,84,96,112,124,136,148,160,172,184,196]){
     const r=rooms[ri]; if(!r)continue;
     const x=r.x0+1, y=r.y0+1;
     const pos=new THREE.Vector3(wx(x),0,wx(y));
@@ -1288,9 +1402,10 @@ function woolTex(){ // кучерявая шерсть козы
 }
 
 /* ================== ВРАГИ ================== */
-function makeGhost(){
+function makeGhost(evil){
   /* ПРИЗРАК-СКИТАЛЕЦ v11.2 (ремодель): двухслойный рваный балахон, капюшон с провалом
-     лица, светящийся знак на груди, ожерелье из костей, лапы-когти, глаза-огни */
+     лица, светящийся знак на груди, ожерелье из костей, лапы-когти, глаза-огни.
+     v12: evil=true — обитатель второго этажа, алые глаза */
   const g=new THREE.Group();
   const cloakMat=new THREE.MeshBasicMaterial({color:0xffffff,map:ghostTex(),transparent:true,opacity:0.62,side:THREE.DoubleSide});
   const cloak=new THREE.Mesh(new THREE.ConeGeometry(0.46,1.5,10,1,true),cloakMat);
@@ -1310,7 +1425,7 @@ function makeGhost(){
   const faceVoid=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8),
     new THREE.MeshBasicMaterial({color:0x0a0812}));
   faceVoid.position.set(0,1.4,0.1); faceVoid.scale.set(1,1.15,0.7);
-  const eyeM=new THREE.MeshBasicMaterial({color:0x8affe8});
+  const eyeM=new THREE.MeshBasicMaterial({color:evil?0xff7a5a:0x8affe8});
   const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),eyeM); e1.position.set(-0.085,1.42,0.19);
   const e2=e1.clone(); e2.position.x=0.085;
   /* светящийся знак на груди */
@@ -1667,14 +1782,17 @@ function updateKaver(en,dt){
   }
 }
 const sScreech=()=>{beep(1400,250,0.45,'sawtooth',0.2);setTimeout(()=>beep(900,150,0.3,'square',0.15),180);};
-function spawnEnemy(kind){
+function spawnEnemy(kind,floor,mul=1){
   const st=ENEMY_STATS[kind];
+  /* v12: спавн на заданном этаже (1 — по умолчанию, 2 — готическое крыло) */
+  const xMin=floor===2?FLOOR2:0, xMax=floor===2?G:FLOOR2;
   const cells=shuffle(floorCells.filter(([x,y])=>{
+    if(x<xMin||x>=xMax)return false;
     const d=Math.hypot(wx(x)-player.pos.x,wx(y)-player.pos.z);
     return d>16&&!doorAt.has(x+'_'+y);
   }));
-  const [x,y]=cells[0]||[rooms[30].x0+1,rooms[30].y0+1];
-  const mesh=st.ghost?(kind==='bossGhost'?makeBossGhost():makeGhost())
+  const [x,y]=cells[0]||[rooms[floor===2?130:30].x0+1,rooms[floor===2?130:30].y0+1];
+  const mesh=st.ghost?(kind==='bossGhost'?makeBossGhost():(floor===2?makeGhost(true):makeGhost()))
     :kind==='kaver'?makeKaver()
     :kind==='pilgor'?makePilgor()
     :(kind==='bossKnight'?makeBossKnight():makeKnight());
@@ -1684,7 +1802,7 @@ function spawnEnemy(kind){
     mesh.scale.setScalar(st.ghost?2.0:1.9);
   }
   scene.add(mesh);
-  enemies.push({kind,mesh,hp:st.hp,maxHp:st.hp,speed:st.speed,dmg:st.dmg,atkCd:st.atkCd,
+  enemies.push({kind,mesh,hp:Math.round(st.hp*mul),maxHp:Math.round(st.hp*mul),speed:st.speed,dmg:st.dmg*mul,atkCd:st.atkCd,
     cd:0,state:'wander',dir:new THREE.Vector2(Math.random()-0.5,Math.random()-0.5),wt:0,
     dead:false,deathT:0,respawnT:0,t:Math.random()*10,boss:!!st.boss,name:st.name||null});
   if(kind==='kaver'){
@@ -1714,7 +1832,7 @@ function dropLoot(px,pz){
   }
 }
 const player={pos:new THREE.Vector3(wx(2),1.6,wx(2)),yaw:-Math.PI/2,pitch:0,
-  hp:100,food:100,water:100,poison:0,hasKey:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
+  hp:100,food:100,water:100,poison:0,hasKey:false,hasKey2:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
   buffSpeed:0,buffArmor:0, // v11.4: секунды действия зелья скорости / оберега
   coins:0,medkits:0,hasMops:false,hasPilFriend:false,weapon:'blade',weapons:['blade']};
 /* ---------- КОШЕЛЁК: пильгорцы и покупки сохраняются между заходами ---------- */
@@ -1754,7 +1872,7 @@ function renderMenuStats(){
     mp.textContent=pets||'🐾 Питомцев нет';
   }
   const ps=$('pauseStats');
-  if(ps)ps.innerHTML=`🚪 Двери: <b>${openedDoors}/100</b> • ♥ <b>${Math.ceil(player.hp)}</b> • 🪙 <b>${player.coins}</b>`
+  if(ps)ps.innerHTML=`🚪 Двери: <b>${openedDoors}/200</b> • ♥ <b>${Math.ceil(player.hp)}</b> • 🪙 <b>${player.coins}</b>`
     +(player.hasMops?' • 🐕':'')+(player.hasPilFriend?' • 🐐':'');
 }
 torch.position.copy(player.pos);
@@ -1766,6 +1884,11 @@ function spawnAll(){
   for(let i=0;i<diff.knights;i++)spawnEnemy('knight');
   for(let i=0;i<diff.pilgors;i++)spawnEnemy('pilgor');
   spawnEnemy('kaver');
+  /* v12: гарнизон второго этажа — закалённые твари (×1.35 HP/урона, алые глаза призраков) */
+  const m2=1.35;
+  for(let i=0;i<diff.ghosts;i++)spawnEnemy('ghost',2,m2);
+  for(let i=0;i<diff.knights;i++)spawnEnemy('knight',2,m2);
+  for(let i=0;i<diff.pilgors;i++)spawnEnemy('pilgor',2,m2);
 }
 
 /* ================== КОЛЛИЗИИ ================== */
@@ -2329,7 +2452,7 @@ function die(why){
   saveBest(); renderMenuStats(); // v11.4: рекорд лучшей двери
   player.buffSpeed=0; player.buffArmor=0; // эффекты не переживают смерть
   $('deathMsg').textContent=why;
-  $('deathStats').textContent=`Открыто дверей: ${openedDoors}/100. Продержался ${Math.floor(elapsed)} c.`;
+  $('deathStats').textContent=`Открыто дверей: ${openedDoors}/200 (этаж ${isFloor2(player.pos.x)?2:1}). Продержался ${Math.floor(elapsed)} c.`;
   /* чекпоинт: за каждые 25 открытых дверей — одно возрождение */
   const n=Math.max(0,Math.floor(openedDoors/25)-revivesUsed);
   $('reviveBtn').style.display=n>0?'':'none';
@@ -2341,9 +2464,11 @@ function revive(){
   dead=false; player.poison=0;
   player.hp=55;
   player.food=Math.max(player.food,40); player.water=Math.max(player.water,40);
-  /* возвращаем к спавну или к ближайшей безопасной зоне */
+  /* возвращаем к спавну или к ближайшей безопасной зоне СВОЕГО этажа */
   let bx=wx(2),bz=wx(2);
+  const pF2=isFloor2(player.pos.x);
   for(const z of safeZones){
+    if(isFloor2(z.pos.x)!==pF2)continue; // v12: чекпоинт только на этаже смерти
     if(Math.hypot(z.pos.x-player.pos.x,z.pos.z-player.pos.z)<40){bx=z.pos.x;bz=z.pos.z;break;}
   }
   player.pos.x=bx; player.pos.z=bz; player.pos.y=1.6; player.vy=0; player.safeT=0; player.warnedSafe=false;
@@ -2470,11 +2595,11 @@ for(const [b,fn] of [['menuShopBtn',openShop],['pShopBtn',openShop],['menuInvBtn
 function win(){
   won=true; running=false;
   document.exitPointerLock();
-  saveBest(); // v11.4: рекорд — 100 дверей
-  player.coins+=100; saveWallet(); // v10: награда за полное прохождение
+  saveBest(); // v11.4: рекорд
+  player.coins+=200; saveWallet(); // v12: награда за полное прохождение двух этажей
   renderMenuStats();
   sKey();
-  $('winStats').textContent=`Ты выбрался из замка! Открыто дверей: ${openedDoors}/100 за ${Math.floor(elapsed)} c. НАГРАДА: 🪙 +100 пильгорцев (всего: ${player.coins})!`;
+  $('winStats').textContent=`Ты ВЛАДЫКА ДВУХ ЭТАЖЕЙ! Открыто дверей: ${openedDoors}/200 за ${Math.floor(elapsed)} c. НАГРАДА: 🪙 +200 пильгорцев (всего: ${player.coins})!`;
   $('winOv').classList.remove('hidden');
 }
 
@@ -2756,7 +2881,7 @@ function update(dt){
   for(let i=items.length-1;i>=0;i--){
     const it=items[i];
     it.mesh.rotation.y+=dt*1.5;
-    if(it.type!=='key'&&it.type!=='mops')it.mesh.position.y=0.25+Math.sin(elapsed*2+i)*0.04;
+    if(it.type!=='key'&&it.type!=='key2'&&it.type!=='mops')it.mesh.position.y=0.25+Math.sin(elapsed*2+i)*0.04;
     const dist=it.mesh.position.distanceTo(tmpV.set(player.pos.x,0.5,player.pos.z));
     if(dist<1.1){
       if(it.type==='food'){player.food=Math.min(100,player.food+30);msg('🍞 Хлеб съеден (+30 сытости)','#e0a94b');sPick();}
@@ -2768,24 +2893,47 @@ function update(dt){
         sKey(); vib(300);
         msg('🐕🐕🐕 НЕВЕРОЯТНО! Тайная комната 1-к-100-000! ЛЕГЕНДАРНЫЙ МОПС ТЕПЕРЬ ТВОЙ НАВСЕГДА!','#ffb0d0');
       }
-      else{player.hasKey=true;sKey();msg('🗝 ЗОЛОТОЙ КЛЮЧ НАЙДЕН! Ищи зелёный луч над вратами в финальном зале!','#ffd75e');$('keyicon').style.opacity=1;exitBeam.visible=true;
-        exitGate.material=new THREE.MeshLambertMaterial({color:0x143a24,emissive:0x1a8a4a});
-        msg('⚡ Из глубин замка раздался рёв... ВЛАДЫКА ЗАМКА охраняет выход!','#e08ae0');
+      else if(it.type==='key2'){
+        player.hasKey2=true;sKey();vib(200);
+        msg('🔑 СЕРЕБРЯНЫЙ КЛЮЧ НАЙДЕН! Откроет синие врата финала на глубине второго этажа!','#9ac8ff');
+        $('keyicon').style.opacity=1;
+        $('keyicon').textContent='🔑 Серебряный ключ получен — врата финала ждут на глубине этажа 2!';
+        exitBeam2.visible=true;
+        msg('⚡ Из-за синих врат донёсся ледяной рокот... наверху тебя ждёт нечто древнее.','#8ab0ff');
+      }
+      else{player.hasKey=true;sKey();msg('🗝 ЗОЛОТОЙ КЛЮЧ НАЙДЕН! Врата-лестница в финальном зале теперь откликнутся!','#ffd75e');$('keyicon').style.opacity=1;exitBeam.visible=true;
+        exitGate.material=new THREE.MeshLambertMaterial({color:0x3a2a08,emissive:0x8a6a10});
+        msg('⚡ Из глубин замка раздался рёв... ВЛАДЫКА ЗАМКА охраняет лестницу!','#e08ae0');
         spawnBoss('bossGhost');}
       scene.remove(it.mesh); items.splice(i,1);
     }
   }
 
-  /* --- выход --- */
+  /* --- выход: v12 — врата этажа 1 это ЛЕСТНИЦА, финал наверху (exitPos2) --- */
   exitMsgCd-=dt;
-  /* ВАЖНО: 2D-дистанция по горизонтали! 3D-дистанция до пола минимум 1.6 (глаза игрока на высоте 1.6),
-     и проверка <1.6 НИКОГДА не срабатывала — главный софтлок финала: с ключом у выхода ничего не происходило */
-  const exDist=Math.hypot(player.pos.x-exitPos.x,player.pos.z-exitPos.z);
-  if(exDist<1.6){
-    if(player.hasKey&&openedDoors>=100)win();
+  if(floorFxT>0){floorFxT-=dt;$('floorfx').style.opacity=Math.max(0,Math.min(1,floorFxT/0.25));}
+  else{$('floorfx').style.opacity=0;}
+  const onFloor2=isFloor2(player.pos.x);
+  /* лестница наверх (первый этаж) */
+  const stDist=Math.hypot(player.pos.x-exitPos.x,player.pos.z-exitPos.z);
+  if(!onFloor2&&stDist<1.6&&stairCd<=0){
+    if(player.hasKey&&openedDoors>=100)climbStairs(false);
     else if(exitMsgCd<=0){exitMsgCd=3;
-      if(!player.hasKey)msg('Выходная дверь заперта. Нужен золотой ключ!','#e07a7a');
-      else msg(`⛓ Магический барьер держит выход! Открой ВСЕ 100 дверей по порядку (осталось ${100-openedDoors})`,'#e07a7a');
+      if(!player.hasKey)msg('⛓ Лестница заперта магией! Нужен золотой ключ!','#e07a7a');
+      else msg(`⛓ Барьер держит лестницу! Открой ВСЕ 100 дверей этажа (осталось ${100-openedDoors})`,'#e07a7a');
+    }
+  }
+  /* лестница вниз (второй этаж) — свободный спуск */
+  const sdDist=Math.hypot(player.pos.x-stairsPos.x,player.pos.z-stairsPos.z);
+  if(onFloor2&&sdDist<1.6&&stairCd<=0)climbStairs(true);
+  if(stairCd>0)stairCd-=dt;
+  /* ВРАТА ФИНАЛА наверху */
+  const exDist=Math.hypot(player.pos.x-exitPos2.x,player.pos.z-exitPos2.z);
+  if(exDist<1.6){
+    if(player.hasKey2&&openedDoors>=200)win();
+    else if(exitMsgCd<=0){exitMsgCd=3;
+      if(!player.hasKey2)msg('Врата финала заперты! Нужен серебряный ключ с глубин второго этажа!','#7aa8e0');
+      else msg(`⛓ Магический барьер! Открой ВСЕ 200 дверей (осталось ${200-openedDoors})`,'#7aa8e0');
     }
   }
 
@@ -2795,7 +2943,9 @@ function update(dt){
       if(en.deathT>0){en.deathT-=dt;en.mesh.scale.multiplyScalar(1-dt*2);en.mesh.position.y-=dt*1.2;
         if(en.deathT<=0)en.mesh.visible=false;}
       else if(!en.boss){en.respawnT-=dt;if(en.respawnT<=0){
-        const cells=shuffle(floorCells.filter(([x,y])=>Math.hypot(wx(x)-player.pos.x,wx(y)-player.pos.z)>20&&!doorAt.has(x+'_'+y)));
+        /* v12: враг возрождается на этаже игрока — не «телепортируется» между этажами */
+        const xMin=isFloor2(player.pos.x)?FLOOR2:0, xMax=isFloor2(player.pos.x)?G:FLOOR2;
+        const cells=shuffle(floorCells.filter(([x,y])=>x>=xMin&&x<xMax&&Math.hypot(wx(x)-player.pos.x,wx(y)-player.pos.z)>20&&!doorAt.has(x+'_'+y)));
         const [x,y]=cells[0]||[rooms[30].x0+1,rooms[30].y0+1];
         en.mesh.position.set(wx(x),en.kind==='ghost'?1.5:0,wx(y));
         const rst=ENEMY_STATS[en.kind];
@@ -3028,7 +3178,7 @@ function update(dt){
   $('hpnum').textContent=Math.ceil(player.hp);
   $('foodnum').textContent=Math.ceil(player.food);
   $('waternum').textContent=Math.ceil(player.water);
-  $('doorcount').textContent=`Двери: ${openedDoors} / 100 • 🪙 ${player.coins}`;
+  $('doorcount').textContent=`этаж ${isFloor2(player.pos.x)?2:1} • двери ${openedDoors}/200 • 🪙 ${player.coins}`;
   /* v11.4: индикатор активных эффектов */
   {
     let bts='';
@@ -3037,11 +3187,17 @@ function update(dt){
     const bb=$('buffbar');
     if(bb._t!==bts){bb._t=bts;bb.textContent=bts;bb.style.display=bts?'block':'none';}
   }
-  /* v10: подсказка-компас к СЛЕДУЮЩЕЙ по номеру двери */
+  /* v10: подсказка-компас к СЛЕДУЮЩЕЙ по номеру двери; v12: если дверь на другом этаже — вести к лестнице */
   {
     const nd=doors.find(d=>d.num===openedDoors+1);
     const nh=$('nexthint');
     if(nd&&!dead&&!won){
+      const ndF2=cellFloor2(nd.gx);
+      const pF2=isFloor2(player.pos.x);
+      if(ndF2!==pF2){ // дверь на другом этаже — лестница в финальном зале
+        nh.style.display='block';
+        nh.innerHTML=`🪜 Дверь <b style="color:#ffd75e">#${nd.num}</b> ${ndF2?'НАВЕРХУ':'ВНИЗУ'} — иди к ${ndF2?'ВЕЛИКОЙ ЛЕСТНИЦЕ (золотой луч)':'лестнице-спуску'}`;
+      }else{
       const dx=wx(nd.gx)-player.pos.x, dz=wx(nd.gy)-player.pos.z;
       const dist=Math.hypot(dx,dz);
       const tYaw=Math.atan2(-dx,-dz);
@@ -3050,6 +3206,7 @@ function update(dt){
       nh.style.display='block';
       nh.innerHTML=`🚪 Дверь <b style="color:#ffd75e">#${nd.num}</b> • ${Math.round(dist)} м <span style="display:inline-block">▲</span>`;
       nh.lastChild.style.transform=`rotate(${(-rel).toFixed(2)}rad)`;
+      }
     } else nh.style.display='none';
   }
   /* сообщение о смене крыла замка (с защитой от спама на границе) */
@@ -3059,15 +3216,21 @@ function update(dt){
     const w=gy2<15?0:gy2<27?1:gy2<39?2:3;
     if(w!==curWing&&wingMsgCd<=0){curWing=w;wingMsgCd=20;msg(WING_NAMES[w],'#c8b890');}
   }
-  /* компас: после ключа указывает на выход (стрелка крутится поyaw) */
+  /* компас: v12 — золотой ключ ведёт к лестнице, серебряный — к вратам финала */
   const cp=$('compass');
-  if(player.hasKey&&!dead&&!won){
-    const tYaw=Math.atan2(-(exitPos.x-player.pos.x),-(exitPos.z-player.pos.z));
-    let rel=tYaw-player.yaw;
-    while(rel>Math.PI)rel-=2*Math.PI; while(rel<-Math.PI)rel+=2*Math.PI;
-    cp.style.display='block';
-    cp.style.transform=`translateX(-50%) rotate(${(-rel).toFixed(3)}rad)`;
-  } else cp.style.display='none';
+  {
+    let tgt=null;
+    if(isFloor2(player.pos.x)){ if(player.hasKey2)tgt=exitPos2; }
+    else if(player.hasKey)tgt=exitPos;
+    if(tgt&&!dead&&!won){
+      const tYaw=Math.atan2(-(tgt.x-player.pos.x),-(tgt.z-player.pos.z));
+      let rel=tYaw-player.yaw;
+      while(rel>Math.PI)rel-=2*Math.PI; while(rel<-Math.PI)rel+=2*Math.PI;
+      cp.style.display='block';
+      cp.textContent=tgt===exitPos2?'▼ ФИНАЛ':'▲ ЛЕСТНИЦА';
+      cp.style.transform=`translateX(-50%) rotate(${(-rel).toFixed(3)}rad)`;
+    } else cp.style.display='none';
+  }
   const bosses=enemies.filter(e=>e.boss&&!e.dead);
   const bb=$('bossbar');
   if(bosses.length){
