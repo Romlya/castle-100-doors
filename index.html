@@ -183,8 +183,7 @@
     WASD — движение &nbsp;•&nbsp; Мышь — обзор &nbsp;•&nbsp; E — открыть дверь<br>
     ЛКМ — удар мечом &nbsp;•&nbsp; ПРОБЕЛ — прыжок (перепрыгивай шипы!) &nbsp;•&nbsp; Shift — бег<br>
     Esc/P — пауза &nbsp;•&nbsp; <b>B — мышь</b> &nbsp;•&nbsp; <b>M — магазин 🛒</b> &nbsp;•&nbsp; <b>I — инвентарь 🎒</b> &nbsp;•&nbsp; <b>Q/1-2-3 — оружие</b><br>
-    <span style="color:#8f8674">Кнопки 🛒 и 🎒 есть и в меню — покупай и надевай оружие прямо из паузы!</span><br>
-    <span style="color:#9a8ab0;font-style:italic">...говорят, если закружиться на месте трижды, замок дарит подарок...</span>
+    <span style="color:#8f8674">Кнопки 🛒 и 🎒 есть и в меню — покупай и надевай оружие прямо из паузы!</span>
   </div>
 </div>
 
@@ -1834,6 +1833,7 @@ const sBossRoar=(a=1)=>{beep(75,32,0.8,'sawtooth',0.24*a);setTimeout(()=>beep(11
 const sGiggle=(a=1)=>{beep(1300,1100,0.07,'square',0.09*a);setTimeout(()=>beep(1150,950,0.07,'square',0.08*a),90);setTimeout(()=>beep(1000,760,0.12,'square',0.08*a),180);};
 const sBell=(a=1)=>beep(1500,900,0.25,'sine',0.09*a);
 const sSadBleat=(a=1)=>beep(340,120,0.55,'sawtooth',0.18*a);
+const sKaverDie =(a=1)=>{beep(1250,240,0.5,'sawtooth',0.13*a);setTimeout(()=>beep(850,110,0.45,'square',0.09*a),200);};
 
 /* ================== HUD ================== */
 const $=id=>document.getElementById(id);
@@ -2219,6 +2219,7 @@ function killEnemy(en){
   if(en.kind==='ghost'||en.kind==='bossGhost')sGhostDie(da);
   else if(en.kind==='knight'||en.kind==='bossKnight'){sClank(da);setTimeout(()=>sKnightGrowl(da),140);}
   else if(en.kind==='pilgor'){sBell(da);setTimeout(()=>sSadBleat(da),140);}
+  else if(en.kind==='kaver'){sGiggle(da);setTimeout(()=>sKaverDie(da),160);}
   if(en.boss){
     msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы, аптечку и горсть пильгорцев!`,'#7ae07a');
     sKey();
@@ -2783,6 +2784,18 @@ function update(dt){
       en.state='chase';
     }
     else if(en.state==='chase'&&(dist>17||!seen))en.state='wander';
+    /* v11.3: враг подаёт голос САМ — бродя по замку или гоняясь, каждые ~9-18с */
+    if(en.voiceCd===undefined)en.voiceCd=3+Math.random()*8;
+    en.voiceCd-=dt;
+    if(en.voiceCd<=0&&en.state!=='aim'&&en.state!=='dash'&&en.state!=='stun'&&!playerInSafe){
+      const ia=distAtt(dist)*0.6;
+      if(isGhost)sGhostWail(ia);
+      else if(en.kind==='knight')sKnightGrowl(ia);
+      else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*ia);
+      else if(en.kind==='bossGhost')sBossRoar(ia*0.8);
+      else if(en.kind==='bossKnight'){sKnightGrowl(ia);setTimeout(()=>sClank(ia),120);}
+      en.voiceCd=9+Math.random()*9;
+    }
 
     /* ПИЛГОР: скрежещет-приседает (0.6с) и делает рывок; врезался в стену — оглушён */
     if(en.kind==='pilgor'){
