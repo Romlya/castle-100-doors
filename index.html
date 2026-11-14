@@ -1330,6 +1330,7 @@ function makeKnight(){
   const sword=new THREE.Mesh(new THREE.BoxGeometry(0.07,1.1,0.12),new THREE.MeshLambertMaterial({color:0x9aa2b5})); sword.position.set(0.62,1.3,0.25); sword.rotation.z=-0.9;
   g.add(body,cv1,cv2,pauldL,pauldR,helm,helmTop,visor,plume,shield,shieldRim,legL,legR,arm,sword);
   g.userData.legs=[legL,legR]; // для анимации шага
+  g.userData.arm=arm; g.userData.sword=sword; g.userData.shield=shield; g.userData.body=body; // v11.1
   return g;
 }
 function makeBossGhost(){
@@ -1409,6 +1410,7 @@ function makeKaver(){
   tailSeg.position.set(0,-0.2,-0.2); tailSeg.rotation.x=0.9;
   const tailTip=new THREE.Mesh(new THREE.SphereGeometry(0.045,6,6),dark); tailTip.position.set(0,-0.36,-0.38);
   g.add(body,head,tuft,earL,earR,e1,e2,pp1,pp2,grin,t1,t2,armL,armR,clL,clR,tailSeg,tailTip);
+  g.userData.ears=[earL,earR]; g.userData.tail=[tailSeg,tailTip]; // v11.1: для анимаций
   return g;
 }
 function makePilgor(){
@@ -1503,7 +1505,7 @@ function updateKaver(en,dt){
     en.tauntT-=dt;
     if(en.tauntT<=0){
       en.tauntT=35+Math.random()*20;
-      if(Math.random()<0.4)msg(KAVER_TAUNTS[(Math.random()*KAVER_TAUNTS.length)|0],'#9a8ab0');
+      if(Math.random()<0.4){msg(KAVER_TAUNTS[(Math.random()*KAVER_TAUNTS.length)|0],'#9a8ab0');sGiggle(0.5);} // v11.1
     }
     if(en.hauntT<=0){
       if(playerInSafe){en.hauntT=2;return;} // в безопасной зоне Каверга не является
@@ -1527,6 +1529,13 @@ function updateKaver(en,dt){
   /* --- haunt: стоит перед лицом и следит за выполнением приказа --- */
   en.commandT-=dt;
   en.mesh.position.y=Math.sin(en.t*9)*0.08;
+  /* v11.1: уши трепещут, хвост виляет */
+  const ku=en.mesh.userData;
+  if(ku&&ku.ears){
+    ku.ears[0].rotation.z=1.15+Math.sin(en.t*13)*0.2;
+    ku.ears[1].rotation.z=-1.15-Math.sin(en.t*13+0.9)*0.2;
+  }
+  if(ku&&ku.tail)ku.tail[0].rotation.y=Math.sin(en.t*7)*0.45;
   en.mesh.rotation.y=Math.atan2(player.pos.x-en.mesh.position.x,player.pos.z-en.mesh.position.z);
   if(curMoved)en.sawMove=true;
   if(player.pos.y>1.95)en.sawJump=true;
@@ -1540,6 +1549,7 @@ function updateKaver(en,dt){
       msg('Каверга недовольно шипит и испаряется...','#9a8ab0');
       beep(700,180,0.4,'sawtooth',0.15);
     }else{
+      sGiggle(0.9); // v11.1: злорадное хихиканье перед пощёчиной
       damage(9*diff.dmg,'Каверга влепила тебе пощёчину за непослушание!');
       msg(`👺 Каверга: «${en.command.label}!!! Я ЖЕ СКАЗАЛА!»`,'#ff7ad0');
     }
@@ -1575,7 +1585,7 @@ function spawnEnemy(kind){
 function spawnBoss(kind){
   spawnEnemy(kind);
   const b=enemies[enemies.length-1];
-  sHorn();
+  sHorn(); sBossRoar(1); // v11.1: рёв пробудившегося босса
   msg(`⚔ ${b.name} ПРОБУДИЛСЯ! (${b.hp} HP)`,'#e08ae0');
 }
 function dropLoot(px,pz){
@@ -1710,6 +1720,18 @@ const sTrap =()=>beep(900,100,0.35,'square',0.15);
 const sHorn =()=>{beep(70,45,0.7,'sawtooth',0.22);setTimeout(()=>beep(55,35,0.9,'sawtooth',0.2),250);};
 const sKey  =()=>{beep(600,900,0.15);setTimeout(()=>beep(900,1200,0.25),120);};
 const sBleat=()=>{beep(320,260,0.28,'sawtooth',0.2);setTimeout(()=>beep(300,230,0.3,'sawtooth',0.18),160);};
+
+/* ================== ОЗВУЧКА ВРАГОВ (v11.1): голос затухает с дистанцией ================== */
+const distAtt=d=>Math.max(0.06,1-d/18);                       // множитель громкости по расстоянию
+const sGhostWail=(a=1)=>{beep(680,240,0.6,'sine',0.10*a);setTimeout(()=>beep(560,200,0.5,'sine',0.07*a),240);};
+const sGhostBite=(a=1)=>beep(300,90,0.22,'triangle',0.14*a);
+const sGhostDie =(a=1)=>{beep(500,60,0.8,'sine',0.12*a);setTimeout(()=>beep(320,50,0.6,'triangle',0.09*a),250);};
+const sKnightGrowl=(a=1)=>{beep(95,60,0.35,'square',0.13*a);setTimeout(()=>beep(80,50,0.25,'square',0.10*a),180);};
+const sClank=(a=1)=>{beep(2400,1800,0.06,'square',0.08*a);setTimeout(()=>beep(1600,1100,0.09,'square',0.07*a),50);};
+const sBossRoar=(a=1)=>{beep(75,32,0.8,'sawtooth',0.24*a);setTimeout(()=>beep(110,40,0.6,'square',0.16*a),200);};
+const sGiggle=(a=1)=>{beep(1300,1100,0.07,'square',0.09*a);setTimeout(()=>beep(1150,950,0.07,'square',0.08*a),90);setTimeout(()=>beep(1000,760,0.12,'square',0.08*a),180);};
+const sBell=(a=1)=>beep(1500,900,0.25,'sine',0.09*a);
+const sSadBleat=(a=1)=>beep(340,120,0.55,'sawtooth',0.18*a);
 
 /* ================== HUD ================== */
 const $=id=>document.getElementById(id);
@@ -2045,6 +2067,11 @@ if(isTouch)document.body.classList.add('touch');
 
 function killEnemy(en){
   en.dead=true; en.deathT=0.8; en.respawnT=en.boss?1e9:en.kind==='kaver'?90:80; sTrap();
+  /* v11.1: предсмертный голос врага (громкость по дистанции) */
+  const da=distAtt(Math.hypot(player.pos.x-en.mesh.position.x,player.pos.z-en.mesh.position.z));
+  if(en.kind==='ghost'||en.kind==='bossGhost')sGhostDie(da);
+  else if(en.kind==='knight'||en.kind==='bossKnight'){sClank(da);setTimeout(()=>sKnightGrowl(da),140);}
+  else if(en.kind==='pilgor'){sBell(da);setTimeout(()=>sSadBleat(da),140);}
   if(en.boss){
     msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы, аптечку и горсть пильгорцев!`,'#7ae07a');
     sKey();
@@ -2107,6 +2134,9 @@ let openedDoors=0;
 const clock=new THREE.Clock();
 const prompt=$('prompt');
 let exitMsgCd=0, bobT=0;
+/* v11.1: анимации от первого лица — инерция оружия, приземление, вздрагивание */
+let swayYaw=0, swayPitch=0, landT=0, flinchT=0;
+let prevCamYaw=player.yaw, prevCamPitch=player.pitch;
 /* анти-софтлок: последняя свободная точка + удержание R = выбраться */
 const lastSafe={x:0,z:0,t:-9};
 let safeMemoT=0, holdR=0, stuckT=0, stuckMsgCd=0, stuckX=0, stuckZ=0;
@@ -2114,6 +2144,7 @@ let safeMemoT=0, holdR=0, stuckT=0, stuckMsgCd=0, stuckX=0, stuckZ=0;
 function damage(n,why){
   if(dead)return;
   player.hp-=n; flash(); sHurt(); vib(70);
+  flinchT=0.35; // v11.1: камера вздрагивает от удара
   if(player.hp<=0){ player.hp=0; die(why); }
 }
 function die(why){
@@ -2401,9 +2432,13 @@ function update(dt){
   if(keys['Space']&&!prevSpace&&onGround&&player.vy<=0)player.vy=5.0;
   prevSpace=keys['Space'];
   if(!onGround||player.vy>0){
+    const fellFast=player.vy<-4.5; // v11.1: помним скорость до касания
     player.vy-=13*dt;
     player.pos.y+=player.vy*dt;
-    if(player.pos.y<=1.6){player.pos.y=1.6;player.vy=0;}
+    if(player.pos.y<=1.6){
+      player.pos.y=1.6;player.vy=0;
+      if(fellFast){landT=0.3;beep(90,50,0.12,'sine',0.1);} // приседание + глухой стук приземления
+    }
     if(player.pos.y>3.05){player.pos.y=3.05;player.vy=Math.min(player.vy,0);}
   }
   camera.position.set(player.pos.x,player.pos.y+Math.sin(bobT)*0.045,player.pos.z);
@@ -2422,11 +2457,29 @@ function update(dt){
     if(Math.abs(spinAcc)>=Math.PI*6){spinAcc=0;spinDir=0;pugRain();}
   }
 
-  /* --- меч --- */
+  /* --- меч + анимации от первого лица (v11.1) --- */
   player.attackCd-=dt;
+  /* оружие чуть отстаёт от поворота камеры — живая инерция */
+  {
+    const dy=player.yaw-prevCamYaw, dp=player.pitch-prevCamPitch;
+    prevCamYaw=player.yaw; prevCamPitch=player.pitch;
+    const k=Math.min(1,dt*10);
+    swayYaw+=(-dy*0.55-swayYaw)*k;
+    swayPitch+=(-dp*0.45-swayPitch)*k;
+  }
   if(swingT>0){ swingT-=dt; const per=(WEAPONS[player.weapon]||WEAPONS.blade).swing;
     weaponHolder.rotation.x=0.35-Math.sin((1-Math.max(0,swingT)/per)*Math.PI)*1.4; }
   else weaponHolder.rotation.x=0.35;
+  weaponHolder.rotation.y=-0.25+swayYaw;
+  weaponHolder.rotation.z=0.25+swayYaw*0.5+(curSprint?0.18:0);
+  weaponHolder.position.x=0.38+swayYaw*0.35;
+  weaponHolder.position.y=-0.34+swayPitch*0.3+(curMoved?Math.sin(bobT*2)*0.014:0)-(landT>0?landT*0.28:0);
+  weaponHolder.position.z=-0.7+(curSprint?0.08:0);
+  if(landT>0)landT-=dt;
+  if(flinchT>0){ // вздрагивание камеры от полученного урона
+    flinchT-=dt;
+    camera.rotation.z=Math.sin(Math.max(0,flinchT)*28)*0.035*Math.max(0,flinchT);
+  } else camera.rotation.z=0;
   weaponHolder.visible=!(swingT>0&&swingT<0.05);
 
   /* --- статы --- */
@@ -2568,7 +2621,20 @@ function update(dt){
     /* призраки «чувствуют» игрока сквозь стены (ближе), остальные — только по прямой видимости */
     const isGhost=en.kind==='ghost';
     const seen=dist<(isGhost?11:13)&&(isGhost||los(ex,ez,player.pos.x,player.pos.z));
-    if(seen&&en.state!=='aim'&&en.state!=='dash'&&en.state!=='stun')en.state='chase';
+    /* v11.1: враг ГОЛОСИТ, когда впервые замечает игрока (и периодически в погоне) */
+    if(en.spotCd===undefined)en.spotCd=0;
+    if(en.spotCd>0)en.spotCd-=dt;
+    if(seen&&en.state!=='aim'&&en.state!=='dash'&&en.state!=='stun'){
+      if(en.state!=='chase'&&en.spotCd<=0&&!playerInSafe){
+        const va=distAtt(dist);
+        if(isGhost)sGhostWail(va);
+        else if(en.kind==='knight'||en.kind==='bossKnight')sKnightGrowl(va);
+        else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*va);
+        else if(en.kind==='bossGhost')sBossRoar(va);
+        en.spotCd=6+Math.random()*4;
+      }
+      en.state='chase';
+    }
     else if(en.state==='chase'&&(dist>17||!seen))en.state='wander';
 
     /* ПИЛГОР: скрежещет-приседает (0.6с) и делает рывок; врезался в стену — оглушён */
@@ -2593,7 +2659,9 @@ function update(dt){
         moveWithCollision(en.mesh.position,0.4,en.dashX*step,en.dashZ*step,true,false,false);
         const moved=Math.hypot(en.mesh.position.x-ox2,en.mesh.position.z-oz2);
         en.mesh.rotation.y=Math.atan2(en.dashX,en.dashZ);
-        en.mesh.position.y=0;
+        /* v11.1: коза скачет на рывке и таранит головой */
+        en.mesh.position.y=Math.abs(Math.sin(en.t*16))*0.22;
+        en.mesh.rotation.x=0.35;
         if(moved<step*0.55){ // ткнулся в стену
           en.state='stun'; en.stunT=1.3; en.cd=2.6; beep(120,60,0.25,'square',0.15);
         }else{
@@ -2609,7 +2677,7 @@ function update(dt){
       if(en.state==='stun'){
         en.stunT-=dt;
         en.mesh.rotation.z=Math.sin(en.t*20)*0.12;
-        en.mesh.position.y=0;
+        en.mesh.position.y=0; en.mesh.rotation.x=0; // v11.1
         if(en.stunT<=0){en.state='chase';en.mesh.rotation.z=0;}
         continue;
       }
@@ -2625,7 +2693,16 @@ function update(dt){
       vx=dx*en.speed; vz=dz*en.speed;
       en.mesh.rotation.y=Math.atan2(dx,dz);
       const ar=en.boss?2.8:1.5;
-      if(dist<ar&&en.cd<=0&&player.pos.y<2.1&&!playerInSafe){en.cd=en.atkCd;damage(en.dmg*diff.dmg,en.kind==='ghost'?'Призрак выпил твою жизнь...':'Рыцарь зарубил тебя своим мечом...');}
+      if(dist<ar&&en.cd<=0&&player.pos.y<2.1&&!playerInSafe){
+        en.cd=en.atkCd;
+        /* v11.1: звук удара + анимация замаха меча */
+        const va=distAtt(dist);
+        if(en.kind==='ghost')sGhostBite(va);
+        else if(en.kind==='bossGhost'){sGhostBite(va);sBossRoar(va*0.7);}
+        else {sClank(va);setTimeout(()=>sKnightGrowl(va),100);}
+        en.swing=1;
+        damage(en.dmg*diff.dmg,en.kind==='ghost'?'Призрак выпил твою жизнь...':'Рыцарь зарубил тебя своим мечом...');
+      }
     }else{
       en.wt-=dt;
       if(en.wt<=0){const a=Math.random()*Math.PI*2;en.dir.set(Math.cos(a),Math.sin(a));en.wt=1.5+Math.random()*2.5;}
@@ -2654,7 +2731,33 @@ function update(dt){
       legs[0].rotation.x=Math.sin(en.t*10)*sw;
       legs[1].rotation.x=-Math.sin(en.t*10)*sw;
     }
-    en.mesh.position.y=(en.kind==='ghost'?1.5+Math.sin(en.t*2.5)*0.15:0);
+    /* v11.1: АНИМАЦИИ ВРАГОВ */
+    en.swing=Math.max(0,(en.swing||0)-dt*2.6);
+    const ud=en.mesh.userData||{};
+    if(en.kind==='knight'||en.kind==='bossKnight'){
+      if(ud.arm&&ud.sword){
+        if(en.swing>0){ // замах с мечом: рука и клинок идут по дуге
+          const s=Math.sin((1-en.swing)*Math.PI);
+          ud.arm.rotation.z=-0.5-s*1.15;
+          ud.arm.rotation.x=-s*0.7;
+          ud.sword.rotation.z=-0.9-s*1.0;
+        }else{
+          ud.arm.rotation.z=-0.5; ud.arm.rotation.x=0; ud.sword.rotation.z=-0.9;
+        }
+      }
+      if(ud.body){ // в погоне рыцарь подаётся вперёд
+        const v2=Math.hypot(en.mesh.position.x-oldx,en.mesh.position.z-oldz)/Math.max(dt,1e-4);
+        ud.body.rotation.x=(en.state==='chase'?0.1:0)*Math.min(1,v2/2);
+      }
+    }
+    if(en.kind==='ghost'||en.kind==='bossGhost'){ // призрак качается в полёте
+      en.mesh.position.y=1.5+Math.sin(en.t*2.5)*0.15;
+      en.mesh.rotation.z=Math.sin(en.t*1.8)*0.10;
+      en.mesh.rotation.x=Math.sin(en.t*1.3)*0.06;
+    }else{
+      en.mesh.position.y=0;
+      if(en.kind==='pilgor'&&en.state!=='dash'&&en.state!=='stun')en.mesh.rotation.x=0;
+    }
   }
 
   /* --- фонтаны восполняют воду --- */
