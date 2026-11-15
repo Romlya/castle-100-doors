@@ -183,6 +183,10 @@
      <b>v12.1:</b> с неба пикируют <b style="color:#ffb0a0">гарпии</b>, крадётся <b>гнилой монах</b> с ядом,
      скелеты-<b style="color:#c8d0c0">лучники</b> стреляют из-за спин, <b>каменные големы</b> держат удар,
      а <b>мызыри</b> нападают роем!
+     <b style="color:#ff9a5a">v12.2:</b> <b>элементали</b> жгут лужи огня, <b style="color:#9ad8ff">ледяные призраки</b> замедляют,
+     <b style="color:#b0a8e0">двойники</b> зеркалят движения, <b style="color:#8aff8a">слизни</b> делятся надвое,
+     <b style="color:#c8a03a">автоматоны</b> блокируют удар щитом. С тварей этажа 2 падают <b style="color:#9ad8ff">👻 ДУШИ</b> —
+     новая валюта!
      Убивай врагов — за 🪙 <b>пильгорцы</b> Мопс и Добрый Пилгор продают еду, зелья и оружие
      (<b>M</b> — лавка, <b>I</b> — инвентарь). Покупки <b>сохраняются</b> между заходами.
      За полное прохождение — 🪙 <b>+200</b>!
@@ -190,6 +194,7 @@
   <div class="statstrip">
     <span>👤 <b id="mUser">Гость</b></span>
     <span>🪙 Пильгорцы: <b id="mCoins">0</b></span>
+    <span>👻 Души: <b id="mSouls">0</b></span>
     <span>🏆 Рекорд: <b id="mBest">—</b></span>
     <span id="mPets"></span>
   </div>
@@ -1300,6 +1305,21 @@ function dropCoins(px,pz,lo,hi){
     c.position.set(px+(Math.random()-0.5)*0.7,0.25,pz+(Math.random()-0.5)*0.7);
     scene.add(c); items.push({mesh:c,type:'coin',val:2});
   }
+}
+/* v12.2: 👻 ДУШИ — валюта Готического крыла, падает с врагов этажа 2 */
+const soulMat=new THREE.MeshBasicMaterial({color:0x9ad8ff,transparent:true,opacity:0.85});
+const soulMatD=new THREE.MeshBasicMaterial({color:0x4a8ac8,transparent:true,opacity:0.5});
+function dropSouls(px,pz,lo,hi){
+  const n=lo+((Math.random()*((hi===undefined?lo:hi)-lo+1))|0);
+  for(let i=0;i<n;i++){
+    const g=new THREE.Group();
+    const orb=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,8),soulMat);
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0x9ad8ff,transparent:true,opacity:0.5,depthWrite:false,blending:THREE.AdditiveBlending}));
+    halo.scale.set(0.7,0.7,1);
+    g.add(orb,halo);
+    g.position.set(px+(Math.random()-0.5)*0.8,0.35,pz+(Math.random()-0.5)*0.8);
+    scene.add(g); items.push({mesh:g,type:'soul',val:1});
+  }
 }placeItems();
 loadStep(88,'Выпускаем монстров…'); await tick();
 
@@ -1644,6 +1664,12 @@ const ENEMY_STATS={
   archer:    {hp:40,  speed:2.5, dmg:11, atkCd:2.4, archer:true, name:'Скелет-лучник'}, // держит дистанцию, стрелы
   bat:       {hp:12,  speed:3.8, dmg:5,  atkCd:0.9, fly:true, swarm:true, name:'Мызырь'}, // рой из трёх
   monk:      {hp:55,  speed:2.2, dmg:8,  atkCd:1.7, poison:8, name:'Гнилой монах'},     // отравляет
+  /* v12.2: ещё пять врагов Готического крыла */
+  elemental: {hp:50,  speed:2.6, dmg:12, atkCd:1.5, fire:true, name:'Пламенный элементаль'}, // оставляет лужи огня
+  iceGhost:  {hp:35,  speed:2.5, dmg:7,  atkCd:1.3, ghost:true, ice:true, name:'Ледяной призрак'}, // замедляет
+  doppel:    {hp:60,  speed:3.3, dmg:10, atkCd:1.2, mirror:true, name:'Двойник'},          // зеркалит движения
+  slime:     {hp:45,  speed:1.9, dmg:8,  atkCd:1.4, slime:true, name:'Слизень'},           // делится при смерти
+  automaton: {hp:80,  speed:2.3, dmg:14, atkCd:1.6, shield:true, name:'Шестерённый автоматон'}, // блокирует удар
   bossGhost: {hp:320, speed:2.7, dmg:20, atkCd:1.3, ghost:true, boss:true, name:'ВЛАДЫКА ЗАМКА'},
   bossKnight:{hp:240, speed:3.4, dmg:18, atkCd:1.2, boss:true, name:'КОМАНДОР ТЬМЫ'},
   kaver:     {hp:60,  speed:0,   dmg:9,  atkCd:1,   name:'Каверга'},
@@ -1809,6 +1835,142 @@ function makeMonk(){
   const hand=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),robeD); hand.position.set(0.34,0.95,0.1);
   g.add(body,hood,face,e1,e2,sash,staff,hand,drip);
   g.userData.staff=staff; g.userData.hand=hand;
+  return g;
+}
+/* ---------- v12.2: ЕЩЁ ПЯТЬ ВРАГОВ ---------- */
+function makeElemental(){
+  /* ПЛАМЕННЫЙ ЭЛЕМЕНТАЛЬ: ядро-магма в каменном панцире, трещины светятся, капли огня */
+  const g=new THREE.Group();
+  const rock=new THREE.MeshLambertMaterial({color:0x3a2a22});
+  const magma=new THREE.MeshBasicMaterial({color:0xff7a20});
+  const magmaY=new THREE.MeshBasicMaterial({color:0xffd23a});
+  const shell=new THREE.Mesh(new THREE.DodecahedronGeometry(0.42,0),rock); shell.position.y=0.75; shell.scale.set(1,1.15,1);
+  const core=new THREE.Mesh(new THREE.SphereGeometry(0.3,10,10),magma); core.position.y=0.75;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),rock); head.position.y=1.35;
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),magmaY); e1.position.set(-0.08,1.38,0.16);
+  const e2=e1.clone(); e2.position.x=0.08;
+  for(let cr=0;cr<5;cr++){ // светящиеся трещины на панцире
+    const crack=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16+Math.random()*0.14,0.03),cr%2?magma:magmaY);
+    const ca=Math.random()*Math.PI*2;
+    crack.position.set(Math.cos(ca)*0.34,0.75+Math.random()*0.3,Math.sin(ca)*0.34);
+    crack.lookAt(0,0.75,0);
+    g.add(crack);
+  }
+  const legGeo=new THREE.BoxGeometry(0.14,0.35,0.16);
+  const legL=new THREE.Mesh(legGeo,rock); legL.position.set(-0.18,0.18,0);
+  const legR=legL.clone(); legR.position.x=0.18;
+  const armGeo=new THREE.BoxGeometry(0.12,0.4,0.14);
+  const armL=new THREE.Mesh(armGeo,rock); armL.position.set(-0.42,0.8,0); armL.rotation.z=0.3;
+  const armR=armL.clone(); armR.position.x=0.42; armR.rotation.z=-0.3;
+  const flame=new THREE.Mesh(new THREE.ConeGeometry(0.14,0.4,6),magma); flame.position.y=1.62; // огонёк на голове
+  g.add(shell,core,head,e1,e2,legL,legR,armL,armR,flame);
+  g.userData.legs=[legL,legR]; g.userData.core=core; g.userData.flame=flame;
+  return g;
+}
+function makeIceGhost(){
+  /* ЛЕДЯНОЙ ПРИЗРАК: полупрозрачная ледяная мантия, сосульки, бирюзовый холод */
+  const g=new THREE.Group();
+  const iceM=new THREE.MeshLambertMaterial({color:0x7ac8e8,transparent:true,opacity:0.65});
+  const iceD=new THREE.MeshLambertMaterial({color:0x4a8ab0,transparent:true,opacity:0.8});
+  const glowM=new THREE.MeshBasicMaterial({color:0xb0ecff});
+  const robe=new THREE.Mesh(new THREE.ConeGeometry(0.38,1.3,9),iceM); robe.position.y=0.65;
+  const hood=new THREE.Mesh(new THREE.SphereGeometry(0.24,10,10),iceD); hood.position.y=1.35; hood.scale.set(1,1.05,1);
+  const face=new THREE.Mesh(new THREE.SphereGeometry(0.15,8,8),new THREE.MeshBasicMaterial({color:0x04202e}));
+  face.position.set(0,1.28,0.09);
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6),glowM); e1.position.set(-0.06,1.3,0.17);
+  const e2=e1.clone(); e2.position.x=0.06;
+  for(let ic=0;ic<4;ic++){ // сосульки с кромки капюшона
+    const icicle=new THREE.Mesh(new THREE.ConeGeometry(0.03,0.14+Math.random()*0.1,5),iceD);
+    icicle.position.set(-0.14+ic*0.09,1.18,0.14); icicle.rotation.x=Math.PI;
+    g.add(icicle);
+  }
+  const core=new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8),glowM); core.position.y=0.95; // ледяное сердце
+  const armL=new THREE.Mesh(new THREE.ConeGeometry(0.08,0.5,6),iceM); armL.position.set(-0.3,0.9,0.1); armL.rotation.z=1.1;
+  const armR=armL.clone(); armR.position.x=0.3; armR.rotation.z=-1.1;
+  g.add(robe,hood,face,e1,e2,core,armL,armR);
+  g.userData.core=core;
+  return g;
+}
+function makeDoppel(){
+  /* ДВОЙНИК: тёмное зеркальное отражение рыцаря — те же доспехи, но чернее ночи */
+  const g=new THREE.Group();
+  const armor=new THREE.MeshLambertMaterial({color:0x14141c});
+  const armorD=new THREE.MeshLambertMaterial({color:0x0a0a10});
+  const eyeM=new THREE.MeshBasicMaterial({color:0xd8d2ff});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.6,0.34),armor); body.position.y=0.85;
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.26,0.28),armorD); head.position.y=1.3;
+  const slit=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.04,0.04),eyeM); slit.position.set(0,1.31,0.15);
+  const pauldL=new THREE.Mesh(new THREE.DodecahedronGeometry(0.16,0),armor); pauldL.position.set(-0.36,1.12,0);
+  const pauldR=pauldL.clone(); pauldR.position.x=0.36;
+  const armL=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.4,0.15),armor); armL.position.set(-0.34,0.62,0.1); armL.rotation.x=-0.4;
+  const armR=armL.clone(); armR.position.x=0.34; armR.rotation.z=0.4;
+  const sword=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.7,0.09),new THREE.MeshBasicMaterial({color:0x504a70}));
+  sword.position.set(0.44,0.62,0.2);
+  const legL=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.45,0.18),armorD); legL.position.set(-0.14,0.22,0);
+  const legR=legL.clone(); legR.position.x=0.14;
+  const mirror=new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.4),new THREE.MeshBasicMaterial({color:0x8a8ac8,transparent:true,opacity:0.35,side:THREE.DoubleSide}));
+  mirror.position.set(0,0.95,0.18); // зеркальце на груди
+  g.add(body,head,slit,pauldL,pauldR,armL,armR,sword,legL,legR,mirror);
+  g.userData.sword=sword; g.userData.legs=[legL,legR]; g.userData.mirror=mirror;
+  return g;
+}
+function makeSlime(){
+  /* СЛИЗЕНЬ ЛАБОРАТОРИИ: полупрозрачная жижа с пузырями и парой злых глаз */
+  const g=new THREE.Group();
+  const goo=new THREE.MeshLambertMaterial({color:0x5a9a3a,transparent:true,opacity:0.8});
+  const gooD=new THREE.MeshLambertMaterial({color:0x3a6a24,transparent:true,opacity:0.9});
+  const blob=new THREE.Mesh(new THREE.SphereGeometry(0.38,10,10),goo); blob.position.y=0.32; blob.scale.set(1,0.75,1);
+  const inner=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,8),gooD); inner.position.y=0.3;
+  const eyeM=new THREE.MeshBasicMaterial({color:0xffe23a});
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),eyeM); e1.position.set(-0.1,0.42,0.28);
+  const e2=e1.clone(); e2.position.x=0.1;
+  const pupM=new THREE.MeshBasicMaterial({color:0x1a1a08});
+  const p1=new THREE.Mesh(new THREE.SphereGeometry(0.02,6,6),pupM); p1.position.set(-0.1,0.42,0.32);
+  const p2=p1.clone(); p2.position.x=0.1;
+  for(let bi=0;bi<3;bi++){
+    const bub=new THREE.Mesh(new THREE.SphereGeometry(0.04,6,6),gooD);
+    bub.position.set(-0.15+Math.random()*0.3,0.5,0.1+Math.random()*0.15);
+    g.add(bub);
+  }
+  const drip=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),goo); drip.position.set(0.2,0.1,0.25);
+  g.add(blob,inner,e1,e2,p1,p2,drip);
+  g.userData.blob=blob;
+  return g;
+}
+function makeAutomaton(){
+  /* ШЕСТЕРЁННЫЙ АВТОМАТОН: латунный корпус, шестерни, щит-шестерня в руке */
+  const g=new THREE.Group();
+  const brass=new THREE.MeshLambertMaterial({color:0x9a7a2e});
+  const brassD=new THREE.MeshLambertMaterial({color:0x6a5420});
+  const gearM=new THREE.MeshBasicMaterial({color:0xc8a03a});
+  const eyeM=new THREE.MeshBasicMaterial({color:0xff9a20});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.62,0.36),brass); body.position.y=0.85;
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.26,0.24,0.28),brassD); head.position.y=1.32;
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.04,6,6),eyeM); e1.position.set(-0.07,1.34,0.15);
+  const e2=e1.clone(); e2.position.x=0.07;
+  const gear1=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.04,8),gearM);
+  gear1.rotation.x=Math.PI/2; gear1.position.set(0,0.85,0.2); // шестерня в груди
+  const gear2=gear1.clone(); gear2.scale.setScalar(0.6); gear2.position.set(0.16,0.72,0.2);
+  const legL=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.45,0.2),brassD); legL.position.set(-0.15,0.22,0);
+  const legR=legL.clone(); legR.position.x=0.15;
+  const armL=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.4,0.15),brass); armL.position.set(-0.34,0.65,0);
+  /* щит-шестерня — блокирует удары */
+  const shield=new THREE.Group(); shield.position.set(0.4,0.8,0.15);
+  const shieldGear=new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.05,10),brassD);
+  shieldGear.rotation.x=Math.PI/2;
+  for(let th=0;th<8;th++){ // зубья шестерни
+    const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.06),brass);
+    const ta=th*Math.PI/4;
+    tooth.position.set(Math.cos(ta)*0.36,Math.sin(ta)*0.36,0);
+    tooth.rotation.z=ta;
+    shield.add(tooth);
+  }
+  shield.add(shieldGear);
+  shield.visible=false; // поднимается по кругу в бою
+  const armR=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.3,0.15),brass); armR.position.set(0.34,0.7,0);
+  shield.position.set(0.4,0.8,0.25);
+  g.add(body,head,e1,e2,gear1,gear2,legL,legR,armL,armR,shield);
+  g.userData.legs=[legL,legR]; g.userData.shield=shield; g.userData.gear=gear1;
   return g;
 }
 function makeKaver(){
@@ -2030,6 +2192,11 @@ function spawnEnemy(kind,floor,mul=1){
       :kind==='archer'?makeArcher()
       :kind==='bat'?makeBat()
       :kind==='monk'?makeMonk()
+      :kind==='elemental'?makeElemental()
+      :kind==='iceGhost'?makeIceGhost()
+      :kind==='doppel'?makeDoppel()
+      :kind==='slime'?makeSlime()
+      :kind==='automaton'?makeAutomaton()
       :(kind==='bossKnight'?makeBossKnight():makeKnight());
     mesh.position.set(wx(x)+(si?0.4*si:0),st.ghost?1.5:flyY,wx(y)+(si?0.3*si:0));
     if(kind==='pilgor')mesh.scale.setScalar(1.2);
@@ -2072,7 +2239,7 @@ function dropLoot(px,pz){
 const player={pos:new THREE.Vector3(wx(2),1.6,wx(2)),yaw:-Math.PI/2,pitch:0,
   hp:100,food:100,water:100,poison:0,hasKey:false,hasKey2:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
   buffSpeed:0,buffArmor:0, // v11.4: секунды действия зелья скорости / оберега
-  coins:0,medkits:0,hasMops:false,hasPilFriend:false,f1done:false,kills:0,weapon:'blade',weapons:['blade']};
+  coins:0,medkits:0,hasMops:false,hasPilFriend:false,f1done:false,kills:0,souls:0,weapon:'blade',weapons:['blade']};
 /* ---------- АККАУНТЫ v12.0b: логин+пароль, профиль в localStorage ---------- */
 /* Хостинг статический (GitHub Pages/Vercel) — сервера нет, поэтому аккаунты
    хранятся в этом браузере: все профили в одном JSON, пароль только хэшем (SHA-256).
@@ -2217,6 +2384,7 @@ function loadWallet(){
     player.hasMops=!!w.hasMops;
     player.hasPilFriend=!!w.hasPilFriend;
     player.f1done=!!w.f1done; // v12.1b: этаж 1 пройден — открыт вход на этаж 2 из меню
+    player.souls=w.souls|0;   // v12.2: 👻 души — валюта Готического крыла
     if(Array.isArray(w.weapons)&&w.weapons.includes('blade')){
       player.weapons=[...new Set(['blade',...w.weapons.filter(x=>WEAPONS[x])])];
       if(w.weapon&&WEAPONS[w.weapon]&&player.weapons.includes(w.weapon))player.weapon=w.weapon;
@@ -2227,7 +2395,8 @@ function saveWallet(){
   try{
     accSet('wallet',JSON.stringify({
       coins:player.coins,medkits:player.medkits,hasMops:player.hasMops,
-      hasPilFriend:player.hasPilFriend,f1done:player.f1done,weapons:player.weapons,weapon:player.weapon}));
+      hasPilFriend:player.hasPilFriend,f1done:player.f1done,souls:player.souls|0,
+      weapons:player.weapons,weapon:player.weapon}));
   }catch(e){}
 }
 /* loadWallet() вызывается позже — после объявления WEAPONS (см. loadStep 97) */
@@ -2253,6 +2422,7 @@ const ACHS=[
   {id:'win',    ic:'🏆', name:'ВЛАДЫКА ДВУХ ЭТАЖЕЙ',desc:'Открой все 200 дверей и выберись из замка'},
   {id:'mops',   ic:'🐕', name:'Легенда замка',      desc:'??? — тайна тайной комнаты'},
   {id:'acc',    ic:'👤', name:'Своя история',       desc:'Создай аккаунт — прогресс под твоим именем'},
+  {id:'soul',   ic:'👻', name:'Первая душа',        desc:'Собери душу, выпавшую из твари Готического крыла'},
 ];
 let achs=null;
 function loadAchs(){try{achs=JSON.parse(accGet('ach')||'{}')||{};}catch(e){achs={};}}
@@ -2301,6 +2471,7 @@ function renderMenuStats(){
   const f2b=$('floor2Btn');
   if(f2b)f2b.style.display=player.f1done?'':'none';
   const mc=$('mCoins'); if(mc)mc.textContent=player.coins;
+  const ms=$('mSouls'); if(ms)ms.textContent=player.souls|0; // v12.2: души в меню
   const mb=$('mBest'); if(mb)mb.textContent=bestDoorVal()?('дверь '+bestDoorVal()):'—';
   const mp=$('mPets');
   if(mp){
@@ -2308,7 +2479,7 @@ function renderMenuStats(){
     mp.textContent=pets||'🐾 Питомцев нет';
   }
   const ps=$('pauseStats');
-  if(ps)ps.innerHTML=`🚪 Двери: <b>${openedDoors}/200</b> • ♥ <b>${Math.ceil(player.hp)}</b> • 🪙 <b>${player.coins}</b>`
+  if(ps)ps.innerHTML=`🚪 Двери: <b>${openedDoors}/200</b> • ♥ <b>${Math.ceil(player.hp)}</b> • 🪙 <b>${player.coins}</b> • 👻 <b>${player.souls|0}</b>`
     +(player.hasMops?' • 🐕':'')+(player.hasPilFriend?' • 🐐':'');
 }
 torch.position.copy(player.pos);
@@ -2326,6 +2497,12 @@ function spawnAll(){
   for(let i=0;i<diff.archers;i++)spawnEnemy('archer');
   for(let i=0;i<diff.bats;i++)spawnEnemy('bat');
   for(let i=0;i<diff.monks;i++)spawnEnemy('monk');
+  /* v12.2: вторая пятёрка */
+  for(let i=0;i<diff.elementals;i++)spawnEnemy('elemental');
+  for(let i=0;i<diff.iceGhosts;i++)spawnEnemy('iceGhost');
+  for(let i=0;i<diff.doppels;i++)spawnEnemy('doppel');
+  for(let i=0;i<diff.slimes;i++)spawnEnemy('slime');
+  for(let i=0;i<diff.automatons;i++)spawnEnemy('automaton');
   /* v12: гарнизон второго этажа — закалённые твари (×1.35 HP/урона, алые глаза призраков) */
   const m2=1.35;
   for(let i=0;i<diff.ghosts;i++)spawnEnemy('ghost',2,m2);
@@ -2336,6 +2513,11 @@ function spawnAll(){
   for(let i=0;i<diff.archers;i++)spawnEnemy('archer',2,m2);
   for(let i=0;i<diff.bats;i++)spawnEnemy('bat',2,m2);
   for(let i=0;i<diff.monks;i++)spawnEnemy('monk',2,m2);
+  for(let i=0;i<diff.elementals;i++)spawnEnemy('elemental',2,m2);
+  for(let i=0;i<diff.iceGhosts;i++)spawnEnemy('iceGhost',2,m2);
+  for(let i=0;i<diff.doppels;i++)spawnEnemy('doppel',2,m2);
+  for(let i=0;i<diff.slimes;i++)spawnEnemy('slime',2,m2);
+  for(let i=0;i<diff.automatons;i++)spawnEnemy('automaton',2,m2);
 }
 
 /* ================== КОЛЛИЗИИ ================== */
@@ -2433,6 +2615,13 @@ const sGolemRumble=(a=1)=>{beep(60,38,0.5,'sawtooth',0.2*a);setTimeout(()=>beep(
 const sBoneRattle=(a=1)=>{beep(2100,1700,0.05,'square',0.09*a);setTimeout(()=>beep(1700,1400,0.06,'square',0.08*a),70);setTimeout(()=>beep(1900,1500,0.05,'square',0.07*a),150);};
 const sBatSqueak=(a=1)=>beep(3200,2400,0.09,'sine',0.08*a);
 const sMonkMutter=(a=1)=>{beep(180,140,0.18,'triangle',0.09*a);setTimeout(()=>beep(160,120,0.2,'triangle',0.08*a),150);setTimeout(()=>beep(140,110,0.16,'triangle',0.07*a),300);};
+/* v12.2: голоса второй пятёрки */
+const sFlameCrackle=(a=1)=>{beep(900,300,0.15,'sawtooth',0.1*a);setTimeout(()=>beep(700,250,0.12,'sawtooth',0.08*a),110);};
+const sIceWhisper=(a=1)=>{beep(1400,1100,0.3,'sine',0.07*a);setTimeout(()=>beep(1200,900,0.35,'sine',0.06*a),260);};
+const sDoppelWhisper=(a=1)=>{beep(500,450,0.25,'sine',0.07*a);setTimeout(()=>beep(500,450,0.2,'sine',0.05*a),280);};
+const sSlimeGurgle=(a=1)=>{beep(140,90,0.22,'sine',0.11*a);setTimeout(()=>beep(110,70,0.2,'sine',0.09*a),180);};
+const sGearSpin=(a=1)=>{beep(1500,1300,0.12,'square',0.07*a);setTimeout(()=>beep(1300,1500,0.12,'square',0.06*a),130);};
+const sSoulPick=(a=1)=>{beep(1200,1800,0.2,'sine',0.08*a);setTimeout(()=>beep(1500,2200,0.18,'sine',0.06*a),120);};
 const sGiggle=(a=1)=>{beep(1300,1100,0.07,'square',0.09*a);setTimeout(()=>beep(1150,950,0.07,'square',0.08*a),90);setTimeout(()=>beep(1000,760,0.12,'square',0.08*a),180);};
 const sBell=(a=1)=>beep(1500,900,0.25,'sine',0.09*a);
 const sSadBleat=(a=1)=>beep(340,120,0.55,'sawtooth',0.18*a);
@@ -2475,8 +2664,8 @@ const pugTex=(()=>{
 const fallingPugs=[];
 let spinAcc=0, spinDir=0, lastSpinT=-9, prevYawSpin=null;
 function pugRain(){
-  msg('🐕💨 ПАСХАЛКА! ТЫ НАШЁЛ МОПСОДРОМ! Мопсовый дождь +10 здоровья!','#ffb0d0');
-  player.hp=Math.min(100,player.hp+10);
+  /* v12.1c: хил от пасхалки убран — мопсодром теперь чистая радость для глаз */
+  msg('🐕💨 ПАСХАЛКА! ТЫ НАШЁЛ МОПСОДРОМ! Дождь из мопсов, но без хила!','#ffb0d0');
   vib([30,50,30,50,80]);
   for(let i=0;i<16;i++){
     const m=new THREE.Sprite(new THREE.SpriteMaterial({map:pugTex,transparent:true,depthWrite:false}));
@@ -2496,12 +2685,16 @@ function flash(){const v=$('vignette');v.style.opacity=0.9;setTimeout(()=>v.styl
 /* ================== УПРАВЛЕНИЕ ================== */
 /* ================== СЛОЖНОСТИ ================== */
 const DIFFS={
-  easy:  {dmg:0.75, trap:0.6,  decay:0.8,  ghosts:6,  knights:4, pilgors:2, harpies:2, golems:1, archers:2, bats:1, monks:2,
-    desc:'Враги: 6 призраков, 4 рыцаря, 2 пилгора + гарпии, големы, лучники, мызыри и монахи • урон снижен на четверть'},
-  normal:{dmg:1.0,  trap:1,    decay:1,    ghosts:10, knights:8, pilgors:4, harpies:3, golems:2, archers:3, bats:2, monks:3,
-    desc:'Враги: 10 призраков, 8 рыцарей, 4 пилгора + гарпии, големы, лучники, мызыри и монахи • ПОЛНЫЙ урон'},
-  hard:  {dmg:1.3,  trap:1.3,  decay:1.35, ghosts:13, knights:10, pilgors:5, harpies:4, golems:3, archers:4, bats:3, monks:4,
-    desc:'Враги: 13 призраков, 10 рыцарей, 5 пилгоров + гарпии, големы, лучники, мызыри и монахи • урон усилен на треть!'},
+  /* v12.1c: урон врагов снижен ВДВОЕ по просьбе игрока */
+  easy:  {dmg:0.375, trap:0.6,  decay:0.8,  ghosts:6,  knights:4, pilgors:2, harpies:2, golems:1, archers:2, bats:1, monks:2,
+    elementals:1, iceGhosts:1, doppels:1, slimes:1, automatons:1,
+    desc:'Враги: призраки, рыцари, пилгоры + гарпии, големы, лучники, мызыри, монахи, элементали, ледяные призраки, двойники, слизни и автоматоны • урон снижен ВДВОЕ и ещё −25%'},
+  normal:{dmg:0.5,  trap:1,    decay:1,    ghosts:10, knights:8, pilgors:4, harpies:3, golems:2, archers:3, bats:2, monks:3,
+    elementals:2, iceGhosts:2, doppels:2, slimes:2, automatons:2,
+    desc:'Враги: призраки, рыцари, пилгоры + гарпии, големы, лучники, мызыри, монахи, элементали, ледяные призраки, двойники, слизни и автоматоны • урон снижен ВДВОЕ'},
+  hard:  {dmg:0.65,  trap:1.3,  decay:1.35, ghosts:13, knights:10, pilgors:5, harpies:4, golems:3, archers:4, bats:3, monks:4,
+    elementals:3, iceGhosts:3, doppels:3, slimes:3, automatons:3,
+    desc:'Враги: призраки, рыцари, пилгоры + гарпии, големы, лучники, мызыри, монахи, элементали, ледяные призраки, двойники, слизни и автоматоны • урон снижен ВДВОЕ, но +30%!'},
 };
 let diff=DIFFS.normal;
 document.querySelectorAll('.diffbtn').forEach(b=>{
@@ -2748,6 +2941,8 @@ function swingSword(){
   for(const en of enemies){
     if(en.dead)continue;
     if(en.kind==='kaver'&&en.state!=='haunt')continue; // невидимую Кавергу не ударить
+    /* v12.2: щит-шестерня автомата отражает удар целиком */
+    if(en.kind==='automaton'&&en.shieldT>0){sClank(0.7);continue;}
     const to=new THREE.Vector3(en.mesh.position.x-player.pos.x,0,en.mesh.position.z-player.pos.z);
     const d=to.length();
     if(d<W.range&&to.normalize().dot(new THREE.Vector3(fwd.x,0,fwd.z).normalize())>W.dot){
@@ -2847,6 +3042,9 @@ if(isTouch)document.body.classList.add('touch');
 
 /* v12.1: стрелы скелета-лучника */
 const arrows=[];
+/* v12.2: лужи огня элементалей + зеркало движения игрока для Двойника */
+const firePuddles=[];
+let prevPX=null,prevPZ=null,pMoveX=0,pMoveZ=0;
 function shootArrow(en,dx,dz){
   const g=new THREE.Group();
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.55,5),new THREE.MeshLambertMaterial({color:0x8a7a5a}));
@@ -2881,6 +3079,28 @@ function killEnemy(en){
   else if(en.kind==='archer'){sBoneRattle(da);setTimeout(()=>beep(600,200,0.25,'triangle',0.08*da),180);}
   else if(en.kind==='bat')sBatSqueak(da);
   else if(en.kind==='monk')sMonkMutter(da);
+  else if(en.kind==='elemental')sFlameCrackle(da);
+  else if(en.kind==='iceGhost')sIceWhisper(da);
+  else if(en.kind==='doppel')sDoppelWhisper(da);
+  else if(en.kind==='slime'){sSlimeGurgle(da);setTimeout(()=>sSlimeGurgle(da*0.7),200);}
+  else if(en.kind==='automaton'){sClank(da);setTimeout(()=>sGearSpin(da*0.7),160);}
+  /* v12.2: СЛИЗЕНЬ ДЕЛИТСЯ НАДВОЕ (один раз) */
+  if(en.kind==='slime'&&!en.split&&spawned){
+    for(let sp2=0;sp2<2;sp2++){
+      const st2=ENEMY_STATS.slime, m2x=en.mul||1;
+      const mm=makeSlime(); mm.scale.setScalar(0.62);
+      mm.position.set(en.mesh.position.x+(sp2?0.5:-0.5),0,en.mesh.position.z+(sp2?0.35:-0.35));
+      scene.add(mm);
+      enemies.push({kind:'slime',mesh:mm,hp:Math.round(st2.hp*0.4*m2x),maxHp:Math.round(st2.hp*0.4*m2x),
+        speed:st2.speed*1.2,dmg:Math.max(1,Math.round(st2.dmg*0.6*m2x)),atkCd:st2.atkCd,
+        cd:1,state:'wander',dir:new THREE.Vector2(Math.random()-0.5,Math.random()-0.5),wt:0,
+        dead:false,deathT:0,respawnT:0,t:Math.random()*4,boss:false,name:st2.name,split:true,mul:m2x});
+    }
+    msg('🧪 Слизень ДЕЛИТСЯ надвое! Добей обе половины!','#8aff8a');
+  }
+  /* v12.2: 👻 души капают с врагов Готического крыла (этаж 2), боссов — горсть */
+  if(isFloor2(en.mesh.position.x)&&!en.boss)dropSouls(en.mesh.position.x,en.mesh.position.z,1,2);
+  else if(isFloor2(en.mesh.position.x)&&en.boss)dropSouls(en.mesh.position.x,en.mesh.position.z,8,12);
   if(en.boss){
     msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы, аптечку и горсть пильгорцев!`,'#7ae07a');
     sKey();
@@ -2905,6 +3125,16 @@ function killEnemy(en){
     msg('🦇 Мызырь из роя повержен!','#b8a0c8');
   } else if(en.kind==='monk'){
     msg('☠ Гнилой монах сник — гниль погасла.','#9fd8a8');
+  } else if(en.kind==='elemental'){
+    msg('🔥 Пламя элементаля погасло!','#ffb07a');
+  } else if(en.kind==='iceGhost'){
+    msg('❄ Ледяной призрак растаял лужицей.','#9ad8ff');
+  } else if(en.kind==='doppel'){
+    msg('🪞 Двойник раскололся — зеркало треснуло.','#b0a8e0');
+  } else if(en.kind==='slime'){
+    msg('🧪 Слизень растёкся лужей.','#8aff8a');
+  } else if(en.kind==='automaton'){
+    msg('⚙ Автоматон развалился на шестерни!','#c8a03a');
   } else {
     msg(en.kind==='ghost'?'Призрак развеян!':'Рыцарь повержен!','#9fd0ff');
   }
@@ -2977,7 +3207,7 @@ function die(why){
   dead=true; running=false;
   document.exitPointerLock();
   saveBest(); renderMenuStats(); // v11.4: рекорд лучшей двери
-  player.buffSpeed=0; player.buffArmor=0; // эффекты не переживают смерть
+  player.buffSpeed=0; player.buffArmor=0; player.slowT=0; // эффекты не переживают смерть
   $('deathMsg').textContent=why;
   $('deathStats').textContent=`Открыто дверей: ${openedDoors}/200 (этаж ${isFloor2(player.pos.x)?2:1}). Продержался ${Math.floor(elapsed)} c.`;
   /* чекпоинт: за каждые 25 открытых дверей — одно возрождение */
@@ -3216,7 +3446,7 @@ function update(dt){
   if(keys['ArrowUp'])player.pitch=Math.min(1.5,player.pitch+1.8*dt);
   if(keys['ArrowDown'])player.pitch=Math.max(-1.5,player.pitch-1.8*dt);
   const sprint=keys['ShiftLeft']||keys['ShiftRight']||touchSprint;
-  const spd=(sprint?6.1:4.3)*(player.food<=0||player.water<=0?0.75:1)*(player.buffSpeed>0?1.4:1);
+  const spd=(sprint?6.1:4.3)*(player.food<=0||player.water<=0?0.75:1)*(player.buffSpeed>0?1.4:1)*(player.slowT>0?0.55:1); // v12.2: лёд замедляет
   let mx=0,mz=0;
   if(keys['KeyW'])mz-=1; if(keys['KeyS'])mz+=1;
   if(keys['KeyA'])mx-=1;
@@ -3416,6 +3646,11 @@ function update(dt){
       if(it.type==='food'){player.food=Math.min(100,player.food+30);msg('🍞 Хлеб съеден (+30 сытости)','#e0a94b');sPick();}
       else if(it.type==='water'){player.water=Math.min(100,player.water+35);msg('💧 Вода выпита (+35)','#4ba7e0');sPick();}
       else if(it.type==='med'){player.hp=Math.min(100,player.hp+35);msg('💉 Аптечка использована (+35 здоровья)','#ff7a7a');sPick();}
+      else if(it.type==='soul'){
+        player.souls=(player.souls||0)+it.val;sSoulPick();saveWallet();
+        unlockAch('soul');
+        msg(`👻 +${it.val} душа (всего: ${player.souls})`,'#9ad8ff');
+      }
       else if(it.type==='coin'){player.coins+=it.val;msg(`🪙 +${it.val} пильгорца (всего: ${player.coins})`,'#ffd75e');sPick();saveWallet();}
       else if(it.type==='mops'){
         player.hasMops=true; addCompanion('mops'); saveWallet();
@@ -3467,6 +3702,20 @@ function update(dt){
       else msg(`⛓ Магический барьер! Открой ВСЕ 200 дверей (осталось ${200-openedDoors})`,'#7aa8e0');
     }
   }
+
+  /* v12.2: лужи огня элементалей — жгут, пока не остынут */
+  for(let i=firePuddles.length-1;i>=0;i--){
+    const fp=firePuddles[i];
+    fp.t-=dt; fp.tick-=dt;
+    fp.m.children[1].material.opacity=0.5*Math.min(1,fp.t);
+    if(!playerInSafe&&fp.tick<=0&&Math.hypot(player.pos.x-fp.m.position.x,player.pos.z-fp.m.position.z)<0.85){
+      damage(3,'Ты встал в огонь элементаля!'); fp.tick=0.6;
+    }
+    if(fp.t<=0){scene.remove(fp.m);firePuddles.splice(i,1);}
+  }
+  /* зеркало движения игрока — Двойник повторяет твой путь */
+  if(prevPX!==null){pMoveX=player.pos.x-prevPX; pMoveZ=player.pos.z-prevPZ;}
+  prevPX=player.pos.x; prevPZ=player.pos.z;
 
   /* v12.1: стрелы лучников летят, вонзаются в стены и в игрока */
   for(let i=arrows.length-1;i>=0;i--){
@@ -3521,6 +3770,11 @@ function update(dt){
         else if(en.kind==='archer')sBoneRattle(va);
         else if(en.kind==='bat')sBatSqueak(va*1.4);
         else if(en.kind==='monk')sMonkMutter(va);
+        else if(en.kind==='elemental')sFlameCrackle(va);
+        else if(en.kind==='iceGhost')sIceWhisper(va);
+        else if(en.kind==='doppel')sDoppelWhisper(va);
+        else if(en.kind==='slime')sSlimeGurgle(va);
+        else if(en.kind==='automaton')sGearSpin(va);
         else if(en.kind==='knight'||en.kind==='bossKnight')sKnightGrowl(va);
         else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*va);
         else if(en.kind==='bossGhost')sBossRoar(va);
@@ -3540,6 +3794,11 @@ function update(dt){
       else if(en.kind==='archer')sBoneRattle(ia);
       else if(en.kind==='bat')sBatSqueak(ia*1.4);
       else if(en.kind==='monk')sMonkMutter(ia);
+      else if(en.kind==='elemental')sFlameCrackle(ia);
+      else if(en.kind==='iceGhost')sIceWhisper(ia);
+      else if(en.kind==='doppel')sDoppelWhisper(ia);
+      else if(en.kind==='slime')sSlimeGurgle(ia);
+      else if(en.kind==='automaton')sGearSpin(ia);
       else if(en.kind==='knight')sKnightGrowl(ia);
       else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*ia);
       else if(en.kind==='bossGhost')sBossRoar(ia*0.8);
@@ -3669,6 +3928,49 @@ function update(dt){
       continue;
     }
 
+    /* v12.2: ДВОЙНИК — зеркалит движения игрока и бьёт твоим же почерком */
+    if(en.kind==='doppel'&&en.state==='chase'){
+      const dx=(player.pos.x-ex)/dist, dz=(player.pos.z-ez)/dist;
+      moveWithCollision(en.mesh.position,0.4,(dx*en.speed*0.55+pMoveX*1.5)*dt,(dz*en.speed*0.55+pMoveZ*1.5)*dt,true,false,false);
+      en.mesh.rotation.y=Math.atan2(dx,dz);
+      if(dist<1.5&&en.cd<=0&&player.pos.y<2.1&&!playerInSafe){
+        en.cd=en.atkCd; sDoppelWhisper(1);
+        damage(en.dmg*diff.dmg,'Твой Двойник ударил тебя твоим же движением...');
+      }
+      continue;
+    }
+
+    /* v12.2: ШЕСТЕРЁННЫЙ АВТОМАТОН — щит-шестерня поднимается по кругу */
+    if(en.kind==='automaton'){
+      if(en.shieldT===undefined)en.shieldT=0;
+      if(en.shieldCd===undefined)en.shieldCd=1.5+Math.random();
+      en.shieldCd-=dt;
+      if(en.shieldT>0)en.shieldT-=dt;
+      else if(en.shieldCd<=0&&en.state==='chase'){
+        en.shieldT=1.3; en.shieldCd=3.5+Math.random();
+        sGearSpin(distAtt(dist));
+        msg('⚙ АВТОМАТОН поднял щит-шестерню! Жди, пока он опустится!','#c8a03a');
+      }
+    }
+
+    /* v12.2: ПЛАМЕННЫЙ ЭЛЕМЕНТАЛЬ — жарит лужи огня у себя под ногами */
+    if(en.kind==='elemental'){
+      if(en.fireCd===undefined)en.fireCd=1;
+      en.fireCd-=dt;
+      if((en.state==='chase'||en.state==='wander')&&en.fireCd<=0&&firePuddles.length<12){
+        en.fireCd=0.8;
+        const p=new THREE.Group();
+        const pool=new THREE.Mesh(new THREE.CircleGeometry(0.55,10),new THREE.MeshBasicMaterial({color:0xff7a20,transparent:true,opacity:0.55,side:THREE.DoubleSide}));
+        pool.rotation.x=-Math.PI/2;
+        const fl=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0xff9a33,transparent:true,opacity:0.5,depthWrite:false,blending:THREE.AdditiveBlending}));
+        fl.scale.set(1.4,1.4,1); fl.position.y=0.3;
+        p.add(pool,fl);
+        p.position.set(en.mesh.position.x,0.03,en.mesh.position.z);
+        scene.add(p);
+        firePuddles.push({m:p,t:3,tick:0});
+      }
+    }
+
     let vx=0,vz=0;
     if(en.state==='chase'){
       const dx=(player.pos.x-ex)/dist, dz=(player.pos.z-ez)/dist;
@@ -3683,15 +3985,28 @@ function update(dt){
         else if(en.kind==='bossGhost'){sGhostBite(va);sBossRoar(va*0.7);}
         else if(en.kind==='golem'){sGolemRumble(va);setTimeout(()=>beep(90,40,0.2,'square',0.2*va),150);}
         else if(en.kind==='monk')sMonkMutter(va);
+        else if(en.kind==='elemental')sFlameCrackle(va);
+        else if(en.kind==='iceGhost')sIceWhisper(va);
+        else if(en.kind==='doppel')sDoppelWhisper(va);
+        else if(en.kind==='slime')sSlimeGurgle(va);
+        else if(en.kind==='automaton'){sClank(va);setTimeout(()=>sGearSpin(va),100);}
         else {sClank(va);setTimeout(()=>sKnightGrowl(va),100);}
         en.swing=1;
         const WHY={knight:'Рыцарь зарубил тебя своим мечом...',monk:'Гнилой монах коснулся тебя — гниль расползается...',
-          golem:'Голем раздавил тебя каменным кулаком...',harpy:'Гарпия раскромсала тебя когтями...'};
+          golem:'Голем раздавил тебя каменным кулаком...',harpy:'Гарпия раскромсала тебя когтями...',
+          elemental:'Пламенный элементаль испепелил тебя...',iceGhost:'Ледяной призрак заморозил тебя...',
+          doppel:'Двойник отразил твою же ярость...',slime:'Слизень растворил тебя в себе...',
+          automaton:'Автоматон раздавил тебя латунным кулаком...'};
         damage(en.dmg*diff.dmg,en.kind==='ghost'?'Призрак выпил твою жизнь...':(WHY[en.kind]||'Рыцарь зарубил тебя своим мечом...'));
         /* v12.1: ГНИЛОЙ МОНАХ отравляет при каждом касании */
         if(en.kind==='monk'&&player.poison<50){
           player.poison+=ENEMY_STATS.monk.poison;
           msg('☠ Гниль монаха отравила тебя! (яд +8)','#8aff8a');
+        }
+        /* v12.2: ЛЕДЯНОЙ ПРИЗРАК замедляет на 2с */
+        if(en.kind==='iceGhost'){
+          player.slowT=2;
+          msg('❄ Ледяной призрак сковал тебя — ноги ватные 2с!','#9ad8ff');
         }
       }
     }else{
@@ -3766,6 +4081,20 @@ function update(dt){
       if(ud.bowArm)ud.bowArm.rotation.x=en.state==='aim'?-0.45:0;
     }else if(en.kind==='monk'){ // v12.1: посох покачивается, гниль мерцает
       if(ud.staff)ud.staff.rotation.z=Math.sin(en.t*1.4)*0.07;
+    }else if(en.kind==='elemental'){ // v12.2: ядро-магма пульсирует, огонёк пляшет
+      if(ud.core)ud.core.scale.setScalar(1+Math.sin(en.t*11)*0.12);
+      if(ud.flame){ud.flame.rotation.y=en.t*4;ud.flame.position.y=1.62+Math.sin(en.t*13)*0.05;}
+    }else if(en.kind==='iceGhost'){ // v12.2: парение + ледяное сердце
+      en.mesh.position.y=0.15+Math.sin(en.t*2.2)*0.08;
+      en.mesh.rotation.z=Math.sin(en.t*1.6)*0.06;
+      if(ud.core)ud.core.scale.setScalar(1+Math.sin(en.t*4)*0.15);
+    }else if(en.kind==='doppel'){ // v12.2: зеркальце на груди пульсирует
+      if(ud.mirror)ud.mirror.material.opacity=0.25+Math.sin(en.t*3)*0.15;
+    }else if(en.kind==='slime'){ // v12.2: жижа дышит-сплющивается
+      if(ud.blob)ud.blob.scale.set(1+Math.sin(en.t*6)*0.07,0.75-Math.sin(en.t*6)*0.08,1+Math.sin(en.t*6)*0.07);
+    }else if(en.kind==='automaton'){ // v12.2: шестерни крутятся, щит вращается
+      if(ud.gear)ud.gear.rotation.z=en.t*3;
+      if(ud.shield){ud.shield.visible=!!(en.shieldT>0);if(en.shieldT>0)ud.shield.rotation.z+=dt*9;}
     }else{
       en.mesh.position.y=0;
       if(en.kind==='pilgor'&&en.state!=='dash'&&en.state!=='stun')en.mesh.rotation.x=0;
@@ -3832,7 +4161,7 @@ function update(dt){
   $('hpnum').textContent=Math.ceil(player.hp);
   $('foodnum').textContent=Math.ceil(player.food);
   $('waternum').textContent=Math.ceil(player.water);
-  $('doorcount').textContent=`этаж ${isFloor2(player.pos.x)?2:1} • двери ${openedDoors}/200 • 🪙 ${player.coins}`;
+  $('doorcount').textContent=`этаж ${isFloor2(player.pos.x)?2:1} • двери ${openedDoors}/200 • 🪙 ${player.coins} • 👻 ${player.souls|0}`;
   achTick(); // v12.1b: монеты/время — ачивки проверяются лениво
   /* v11.4: индикатор активных эффектов */
   {
