@@ -86,6 +86,12 @@
   #buffbar{position:absolute;top:92px;left:50%;transform:translateX(-50%);display:none;
     font-size:14px;color:#9ae0ff;text-shadow:0 0 6px #003;white-space:nowrap;
     background:rgba(10,20,40,.55);padding:4px 14px;border-radius:6px;border:1px solid #3a5a7a;}
+  /* ===== v12.0b: логин ===== */
+  .loginrow{display:flex;flex-direction:column;gap:8px;margin-top:10px;width:min(300px,86vw);}
+  .loginrow label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:#cfc7b8;text-align:left;}
+  .loginrow input{background:rgba(20,16,10,.8);border:1px solid #55482a;border-radius:8px;
+    color:#e8d9a8;font-size:16px;padding:9px 12px;outline:none;width:100%;box-sizing:border-box;}
+  .loginrow input:focus{border-color:#caa64a;box-shadow:0 0 8px rgba(202,166,74,.4);}
   /* ===== РЕДИЗАЙН МЕНЮ (v10) ===== */
   #startOv,#loadOv,#pauseOv{background:radial-gradient(ellipse at 50% 20%,rgba(40,30,12,.92),rgba(3,3,7,.97) 70%);}
   #startOv::before{content:'';position:absolute;inset:0;pointer-events:none;
@@ -165,6 +171,7 @@
      За полное прохождение — 🪙 <b>+200</b>!
      <span style="color:#ffb0d0">Легендарного МОПСА нельзя купить — только тайная комната (1 к 100 000).</span></p>
   <div class="statstrip">
+    <span>👤 <b id="mUser">Гость</b></span>
     <span>🪙 Пильгорцы: <b id="mCoins">0</b></span>
     <span>🏆 Рекорд: <b id="mBest">—</b></span>
     <span id="mPets"></span>
@@ -205,6 +212,7 @@
     <button id="pShopBtn" class="menubtn">🛒 ЛАВКА</button>
     <button id="pInvBtn" class="menubtn">🎒 ИНВЕНТАРЬ</button>
   </div>
+  <button id="pLogoutBtn" class="settingsbtn hidden">🚪 ВЫЙТИ ИЗ АККАУНТА</button>
 </div>
 
 <div class="overlay hidden" id="shopOv">
@@ -219,6 +227,22 @@
   <h2>🎒 ИНВЕНТАРЬ</h2>
   <div id="invContent"></div>
   <button id="invClose" class="menubtn">Закрыть (I)</button>
+</div>
+
+<div class="overlay hidden" id="loginOv">
+  <h2>👤 ВХОД В ЗАМОК</h2>
+  <p style="font-size:14px;color:#9a8ab0">Профили хранятся в этом браузере: у каждого свой кошелёк, рекорд и настройки.<br>
+     Играешь один — просто жми «Играть без аккаунта».</p>
+  <div class="loginrow">
+    <label>Логин<input id="loginName" maxlength="16" autocomplete="username" placeholder="Рыцарь"></label>
+    <label>Пароль<input id="loginPass" type="password" maxlength="32" autocomplete="current-password" placeholder="••••"></label>
+  </div>
+  <div id="loginMsg" style="color:#ff7a7a;font-size:14px;min-height:18px"></div>
+  <div class="menurow">
+    <button id="loginBtn" class="menubtn">Войти</button>
+    <button id="regBtn" class="menubtn">Создать аккаунт</button>
+  </div>
+  <button id="guestBtn" class="settingsbtn">👤 Играть без аккаунта</button>
 </div>
 
 <div class="overlay hidden" id="loadFailOv">
@@ -239,8 +263,9 @@
   window.__gameLoaded=false; window.__pendingStart=false;
   window.__markLoaded=function(){
     if(window.__gameLoaded)return; window.__gameLoaded=true;
-    var l=document.getElementById('loadOv'), s=document.getElementById('startOv');
+    var l=document.getElementById('loadOv'), s=document.getElementById('loginOv');
     if(l)l.classList.add('hidden');
+    /* v12.0b: сначала экран входа; модуль игры решит — автовход по сессии или loginOv */
     if(s)s.classList.remove('hidden');
   };
   window.__showFail=function(why){
@@ -390,7 +415,7 @@ for(let y=0;y<G;y++)for(let x=0;x<G;x++)if(grid[y][x]===0)floorCells.push([x,y])
 /* ================== НАСТРОЙКИ ================== */
 let settings={sens:1.0,invY:false,volume:1.0,lightGfx:false};
 try{Object.assign(settings,JSON.parse(localStorage.getItem('castle100set')||'{}'));}catch(e){}
-function saveSettings(){try{localStorage.setItem('castle100set',JSON.stringify(settings));}catch(e){}}
+function saveSettings(){try{accSet('set',JSON.stringify(settings));}catch(e){}} // v12.0b: в профиль
 
 /* ================== ТЕКСТУРЫ (canvas) ================== */
 function brickTex(){
@@ -1037,7 +1062,7 @@ doorDefs.forEach(([gx,gy],idx)=>{
   const num=idx+1;
   const alongX=grid[gy][gx-1]===0; // проход вдоль x -> дверь перекрывает z
   const reward=num%10===0;        // каждая 10-я дверь — тайник со звездой на табличке
-  const trapped=Math.random()<0.45;
+  const trapped=Math.random()<0.15; // v12.0b: ловушек (газ/шипы/дротики) в 3 раза меньше
   const trap=trapped?(r=>r<0.4?'spike':r<0.7?'darts':'gas')(Math.random()):null;
   const bloodTrim=trapped&&Math.random()<0.5;
 
@@ -1729,7 +1754,7 @@ function updateKaver(en,dt){
     en.hauntT-=dt;
     en.tauntT-=dt;
     if(en.tauntT<=0){
-      en.tauntT=35+Math.random()*20;
+      en.tauntT=105+Math.random()*60; // v12.0b: стёбы в 3 раза реже
       if(Math.random()<0.4){msg(KAVER_TAUNTS[(Math.random()*KAVER_TAUNTS.length)|0],'#9a8ab0');sGiggle(0.5);} // v11.1
     }
     if(en.hauntT<=0){
@@ -1778,7 +1803,7 @@ function updateKaver(en,dt){
       damage(9*diff.dmg,'Каверга влепила тебе пощёчину за непослушание!');
       msg(`👺 Каверга: «${en.command.label}!!! Я ЖЕ СКАЗАЛА!»`,'#ff7ad0');
     }
-    en.state='hidden'; en.mesh.visible=false; en.hauntT=25+Math.random()*15;
+    en.state='hidden'; en.mesh.visible=false; en.hauntT=75+Math.random()*45; // v12.0b: в 3 раза реже
   }
 }
 const sScreech=()=>{beep(1400,250,0.45,'sawtooth',0.2);setTimeout(()=>beep(900,150,0.3,'square',0.15),180);};
@@ -1807,7 +1832,7 @@ function spawnEnemy(kind,floor,mul=1){
     dead:false,deathT:0,respawnT:0,t:Math.random()*10,boss:!!st.boss,name:st.name||null});
   if(kind==='kaver'){
     const e=enemies[enemies.length-1];
-    e.state='hidden'; e.mesh.visible=false; e.hauntT=25; e.tauntT=40;
+    e.state='hidden'; e.mesh.visible=false; e.hauntT=75; e.tauntT=120; // v12.0b: в 3 раза реже
   }
 }
 function spawnBoss(kind){
@@ -1835,11 +1860,142 @@ const player={pos:new THREE.Vector3(wx(2),1.6,wx(2)),yaw:-Math.PI/2,pitch:0,
   hp:100,food:100,water:100,poison:0,hasKey:false,hasKey2:false,speed:4.3,attackCd:0,vy:0,safeT:0,warnedSafe:false,
   buffSpeed:0,buffArmor:0, // v11.4: секунды действия зелья скорости / оберега
   coins:0,medkits:0,hasMops:false,hasPilFriend:false,weapon:'blade',weapons:['blade']};
+/* ---------- АККАУНТЫ v12.0b: логин+пароль, профиль в localStorage ---------- */
+/* Хостинг статический (GitHub Pages/Vercel) — сервера нет, поэтому аккаунты
+   хранятся в этом браузере: все профили в одном JSON, пароль только хэшем (SHA-256).
+   Гость (без аккаунта) — прежнее поведение: старые ключи localStorage напрямую. */
+const ACC_KEY='castle100accounts';
+const SESS_KEY='castle100session';
+let currentUser=null; // null = гость
+function loadAccounts(){
+  try{return JSON.parse(localStorage.getItem(ACC_KEY)||'{}')||{};}catch(e){return{};}
+}
+function saveAccounts(a){try{localStorage.setItem(ACC_KEY,JSON.stringify(a));}catch(e){}}
+async function passHash(login,pass){
+  const msg=login+'::'+pass+'::zamok100';
+  try{
+    if(window.crypto&&crypto.subtle&&crypto.subtle.digest){
+      const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));
+      return 'sha:'+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){} // http-страница без secure context — фолбэк
+  let h=0x811c9dc5; const s=msg;
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}
+  let h2=0x5a3c19f;
+  for(let i=s.length-1;i>=0;i--){h2^=s.charCodeAt(i);h2=Math.imul(h2,0x2545f491)>>>0;}
+  return 'fb:'+h.toString(16)+h2.toString(16);
+}
+/* роутинг хранилища: ключ 'wallet'|'best'|'set' — у аккаунта свой блоб, у гостя старые ключи */
+const ACC_STORE={wallet:'castle100wallet',best:'castle100best',set:'castle100set'};
+function accGet(key){
+  if(currentUser){
+    const a=loadAccounts(), p=a[currentUser];
+    return p?p[key]:null;
+  }
+  try{return localStorage.getItem(ACC_STORE[key]);}catch(e){return null;}
+}
+function accSet(key,val){
+  if(currentUser){
+    const a=loadAccounts();
+    if(!a[currentUser])return;
+    a[currentUser][key]=val; saveAccounts(a);
+    return;
+  }
+  try{localStorage.setItem(ACC_STORE[key],val);}catch(e){}
+}
+function showLogin(msgTxt){
+  const ov=document.getElementById('loginOv');
+  if(!ov)return;
+  ov.classList.remove('hidden');
+  const st=document.getElementById('startOv'); if(st)st.classList.add('hidden');
+  const lm=document.getElementById('loginMsg'); if(lm)lm.textContent=msgTxt||'';
+  const lbn=document.getElementById('loginName'); if(lbn)lbn.focus();
+}
+function loginFlowDone(){
+  const ov=document.getElementById('loginOv');
+  if(ov)ov.classList.add('hidden');
+  const st=document.getElementById('startOv');
+  if(st)st.classList.remove('hidden');
+  renderMenuStats();
+}
+function doLogin(){
+  const nameEl=document.getElementById('loginName'), passEl=document.getElementById('loginPass');
+  const lm=document.getElementById('loginMsg');
+  const name=(nameEl.value||'').trim(), pass=passEl.value||'';
+  const bad=m=>{if(lm)lm.textContent=m;};
+  if(!name||!pass)return bad('Введи логин и пароль.');
+  if(!/^[A-Za-zА-Яа-яЁё0-9_\-]{2,16}$/.test(name))return bad('Логин: 2–16 букв/цифр.');
+  const a=loadAccounts(), p=a[name];
+  if(!p)return bad('Аккаунт не найден. Создай его!');
+  passHash(name,pass).then(h=>{
+    if(p.h!==h)return bad('Неверный пароль.');
+    currentUser=name;
+    try{sessionStorage.setItem(SESS_KEY,name);}catch(e){}
+    reloadProfile();
+    loginFlowDone();
+  });
+}
+function doRegister(){
+  const nameEl=document.getElementById('loginName'), passEl=document.getElementById('loginPass');
+  const lm=document.getElementById('loginMsg');
+  const name=(nameEl.value||'').trim(), pass=passEl.value||'';
+  const bad=m=>{if(lm)lm.textContent=m;};
+  if(!name||!pass)return bad('Введи логин и пароль.');
+  if(!/^[A-Za-zА-Яа-яЁё0-9_\-]{2,16}$/.test(name))return bad('Логин: 2–16 букв/цифр.');
+  if(pass.length<4)return bad('Пароль: минимум 4 символа.');
+  const a=loadAccounts();
+  if(a[name])return bad('Такой логин уже есть. Войди или придумай другой.');
+  passHash(name,pass).then(h=>{
+    a[name]={h,wallet:null,best:null,set:null};
+    saveAccounts(a);
+    currentUser=name;
+    try{sessionStorage.setItem(SESS_KEY,name);}catch(e){}
+    reloadProfile();
+    loginFlowDone();
+  });
+}
+function doGuest(){
+  currentUser=null;
+  try{sessionStorage.removeItem(SESS_KEY);}catch(e){}
+  reloadProfile();
+  loginFlowDone();
+}
+function doLogout(){
+  currentUser=null;
+  try{sessionStorage.removeItem(SESS_KEY);}catch(e){}
+  running=false; gameStarted=false;
+  document.exitPointerLock&&document.exitPointerLock();
+  for(const id of ['pauseOv','shopOv','invOv','startOv','deathOv','winOv']){
+    const o=document.getElementById(id); if(o)o.classList.add('hidden');
+  }
+  const hud=document.getElementById('hud'); if(hud)hud.style.display='none';
+  showLogin('Ты вышел из аккаунта. Кошелёк сохранён.');
+}
+function reloadProfile(){
+  /* перечитать настройки и кошелёк текущего профиля */
+  try{
+    const s=JSON.parse(accGet('set')||'null');
+    if(s)Object.assign(settings,{sens:1,invY:false,volume:1,lightGfx:false},s);
+  }catch(e){}
+  loadWallet();
+  refreshSettingsUI();
+  renderMenuStats();
+}
+function refreshSettingsUI(){
+  const sr=$('sensRange'),vr=$('volRange'),iy=$('invY'),lg=$('lightGfx');
+  if(sr)sr.value=settings.sens;
+  if(vr)vr.value=settings.volume;
+  if(iy)iy.checked=settings.invY;
+  if(lg)lg.checked=!!settings.lightGfx;
+  const sv=$('sensval'); if(sv)sv.textContent=(+settings.sens).toFixed(1);
+  const vv=$('volval'); if(vv)vv.textContent=Math.round(settings.volume*100)+'%';
+}
 /* ---------- КОШЕЛЁК: пильгорцы и покупки сохраняются между заходами ---------- */
 const WALLET_KEY='castle100wallet';
 function loadWallet(){
   try{
-    const w=JSON.parse(localStorage.getItem(WALLET_KEY)||'null');
+    const raw=accGet('wallet'); // v12.0b: гость → старый ключ, аккаунт → его блоб
+    const w=JSON.parse(raw||'null');
     if(!w)return;
     player.coins=w.coins|0;
     player.medkits=w.medkits|0;
@@ -1853,7 +2009,7 @@ function loadWallet(){
 }
 function saveWallet(){
   try{
-    localStorage.setItem(WALLET_KEY,JSON.stringify({
+    accSet('wallet',JSON.stringify({
       coins:player.coins,medkits:player.medkits,hasMops:player.hasMops,
       hasPilFriend:player.hasPilFriend,weapons:player.weapons,weapon:player.weapon}));
   }catch(e){}
@@ -1861,9 +2017,12 @@ function saveWallet(){
 /* loadWallet() вызывается позже — после объявления WEAPONS (см. loadStep 97) */
 /* ---------- РЕКОРД (v11.4): лучшая дверь за все заходы ---------- */
 const BEST_KEY='castle100best';
-function bestDoorVal(){return parseInt(localStorage.getItem(BEST_KEY)||'0',10)||0;}
-function saveBest(){try{if(openedDoors>bestDoorVal())localStorage.setItem(BEST_KEY,String(openedDoors));}catch(e){}}
+function bestDoorVal(){return parseInt(accGet('best')||'0',10)||0;} // v12.0b: профиль
+function saveBest(){try{if(openedDoors>bestDoorVal())accSet('best',String(openedDoors));}catch(e){}}
 function renderMenuStats(){
+  /* v12.0b: имя профиля + видимость кнопки выхода */
+  const mu=$('mUser'); if(mu)mu.textContent=currentUser||'Гость';
+  const pl=$('pLogoutBtn'); if(pl)pl.style.display=currentUser?'':'none';
   const mc=$('mCoins'); if(mc)mc.textContent=player.coins;
   const mb=$('mBest'); if(mb)mb.textContent=bestDoorVal()?('дверь '+bestDoorVal()):'—';
   const mp=$('mPets');
@@ -2082,6 +2241,13 @@ document.addEventListener('visibilitychange',clearKeys);
 let locked=false, running=false, dead=false, won=false, revivesUsed=0;
 
 $('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); gameStarted=true; startRunning(); };
+/* v12.0b: обработчики экрана входа */
+$('loginBtn').onclick=doLogin;
+$('regBtn').onclick=doRegister;
+$('guestBtn').onclick=doGuest;
+$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$('loginName').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+$('pLogoutBtn').onclick=doLogout;
 $('pauseOv').onclick=()=>startRunning();
 function startRunning(){
   running=true; menuActive=false; manualUnlock=false; $('pauseOv').classList.add('hidden');
@@ -2363,7 +2529,7 @@ if(isTouch)document.body.classList.add('touch');
 }
 
 function killEnemy(en){
-  en.dead=true; en.deathT=0.8; en.respawnT=en.boss?1e9:en.kind==='kaver'?90:80; sTrap();
+  en.dead=true; en.deathT=0.8; en.respawnT=en.boss?1e9:en.kind==='kaver'?270:80; sTrap();
   /* v11.1: предсмертный голос врага (громкость по дистанции) */
   const da=distAtt(Math.hypot(player.pos.x-en.mesh.position.x,player.pos.z-en.mesh.position.z));
   if(en.kind==='ghost'||en.kind==='bossGhost')sGhostDie(da);
@@ -2950,7 +3116,7 @@ function update(dt){
         en.mesh.position.set(wx(x),en.kind==='ghost'?1.5:0,wx(y));
         const rst=ENEMY_STATS[en.kind];
         en.mesh.scale.setScalar(1);en.hp=rst.hp;en.speed=rst.speed;en.dmg=rst.dmg;en.atkCd=rst.atkCd;en.dead=false;
-        if(en.kind==='kaver'){en.state='hidden';en.mesh.visible=false;en.hauntT=20+Math.random()*10;en.tauntT=30;}
+        if(en.kind==='kaver'){en.state='hidden';en.mesh.visible=false;en.hauntT=60+Math.random()*30;en.tauntT=90;} // v12.0b: реже
         else{en.state='wander';en.mesh.visible=true;}
       }}
       continue;
@@ -3249,8 +3415,10 @@ loadStep(97,'Пробуждаем замок…'); await tick();
 updateWeaponView();
 loadWallet(); // пильгорцы и покупки возвращаются из прошлого захода (WEAPONS уже объявлены)
 renderMenuStats(); // v11.4: плашки статистики в стартовом меню
-/* v10: спавн ТАЙНОЙ КОМНАТЫ МОПСА (жребий брошен в декоре, player уже существует) */
-if(mopsSpot&&!player.hasMops){
+/* v10: спавн ТАЙНОЙ КОМНАТЫ МОПСА (жребий брошен в декоре, player уже существует)
+   v12.0b: вынесен в функцию — вызывается ПОСЛЕ выбора профиля (у владельца мопса комнаты нет) */
+function trySpawnMopsRoom(){
+  if(!mopsSpot||player.hasMops)return;
   const [mx,mz]=mopsSpot;
   const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.68,0.9,10),
     new THREE.MeshStandardMaterial({color:0xcaa64a,emissive:0x5a4410,metalness:0.6,roughness:0.4}));
@@ -3266,6 +3434,7 @@ if(mopsSpot&&!player.hasMops){
   scene.add(new THREE.PointLight(0xffb0d0,5,12,2).translateX(mx).translateY(2).translateZ(mz));
   items.push({mesh:mm,type:'mops'});
 }
+/* v12.0b: вызов перенесён в конец модуля — после автовхода по сессии */
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05,clock.getDelta());
@@ -3299,6 +3468,19 @@ window.__game={get running(){return running},set running(v){running=v},
   get wx(){return wx},get OR(){return OR},get S(){return S},get G(){return G},
   get exitPos(){return exitPos},get hasKey(){return player.hasKey}};
 window.__markLoaded&&window.__markLoaded();
+/* v12.0b: СТОРОЖ показал loginOv — теперь решаем: автовход по сессии или экран входа */
+{
+  let sn=null;
+  try{sn=sessionStorage.getItem(SESS_KEY);}catch(e){}
+  const accs=loadAccounts();
+  if(sn&&accs[sn]){
+    currentUser=sn;
+    reloadProfile();
+    loginFlowDone();           // сразу стартовое меню под этим профилем
+  }
+  /* если сессии нет — loginOv уже показан сторожем; гость может нажать «Играть без аккаунта» */
+  trySpawnMopsRoom();          // профиль известен: у владельца мопса тайной комнаты нет
+}
 loadStep(100,'Замок готов!');
 /* пользователь кликнул раньше, чем загрузился движок — входим сами */
 if(window.__pendingStart&&!running){ setTimeout(()=>{ const b=document.getElementById('startBtn'); if(b&&$('startOv').classList.contains('hidden')===false)b.click(); },60); }
