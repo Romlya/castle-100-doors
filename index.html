@@ -2426,6 +2426,9 @@ function spawnEnemy(kind,floor,mul=1,pos=null){
   }
 }
 function spawnBoss(kind,px,pz){
+  /* v12.3c: босс не дублируется — если жив, ничего не спавним */
+  const dup=enemies.find(e=>e.kind===kind&&!e.dead);
+  if(dup)return dup;
   /* v12.3: босс заспавнится в ЦЕНТРЕ СВОЕЙ АРЕНЫ (1 арена — 1 босс) */
   const ar=arenas.find(a=>a.boss===kind);
   const cell=px!==undefined?[px,pz]:(ar?[ar.gx,ar.gy]:null);
@@ -2433,7 +2436,11 @@ function spawnBoss(kind,px,pz){
   const b=enemies[enemies.length-1];
   sHorn(); sBossRoar(1); // v11.1: рёв пробудившегося босса
   msg(`⚔ ${b.name} ПРОБУДИЛСЯ${ar?' В '+ar.name:''}! (${b.hp} HP)`,'#e08ae0');
+  return b;
 }
+/* v12.3c: ВРАТА-БОССЫ — дверь запечатана, пока босс арены жив.
+   Дверь N ведёт ИЗ зала-хозяина арены: убей босса в арене — дверь откроется. */
+const BOSS_GATES={50:'bossKnight',130:'queen',161:'lich',199:'golemGuard'};
 function dropLoot(px,pz){
   const breadMat=new THREE.MeshLambertMaterial({color:0xb5813f});
   const waterMat=new THREE.MeshLambertMaterial({color:0x2f9fe0});
@@ -3407,6 +3414,22 @@ addEventListener('keydown',e=>{
         msg(`🔒 Дверь #${nearDoor.num} заперта древней магией! Сначала открой дверь #${openedDoors+1} (смотри подсказку сверху)`,'#b8a890');
         return;
       }
+      /* v12.3c: ВРАТА-БОССЫ — чтобы пройти дверь, босс арены должен быть МЁРТВ */
+      const gk=BOSS_GATES[nearDoor.num];
+      if(gk){
+        const alive=enemies.find(e=>e.kind===gk&&!e.dead);
+        if(alive){
+          sRattle(); vib(40);
+          msg(`⛓ Дверь #${nearDoor.num} ЗАПЕЧАТАНА! Сначала убей ${alive.name} — его арена рядом!`,'#e08ae0');
+          return;
+        }
+        if(!enemies.some(e=>e.kind===gk)){ // босс ещё ни разу не будился — будим его сейчас
+          spawnBoss(gk);
+          sRattle(); vib(40);
+          msg(`⛓ Дверь #${nearDoor.num} ЗАПЕЧАТАНА БОССОМ! Иди в арену и убей ${ENEMY_STATS[gk].name}!`,'#e08ae0');
+          return;
+        }
+      }
       const d=nearDoor;
       d.open=true; d.anim=0.0001;
       openedDoors++; sDoor();
@@ -3417,11 +3440,6 @@ addEventListener('keydown',e=>{
       if(openedDoors===25)unlockAch('door25');
       if(openedDoors===50)unlockAch('door50');
       if(openedDoors===100)unlockAch('door100');
-      if(openedDoors===50)spawnBoss('bossKnight'); // босс на середине пути — ждёт в АРЕНЕ КОМАНДОРА
-      /* v12.3: боссы арен Готического крыла */
-      if(openedDoors===130)spawnBoss('queen');
-      if(openedDoors===165)spawnBoss('lich');
-      if(openedDoors===199)spawnBoss('golemGuard');
       if(d.trap&&!d.triggered){
         if(d.trap==='spike'){ d.spike=makeSpikes(d.gx,d.gy); d.spike.visible=true; }
         if(d.trap==='gas'){ d.gas=makeGas(d.gx,d.gy); }
@@ -3942,7 +3960,15 @@ function update(dt){
   /* лестница наверх (первый этаж) */
   const stDist=Math.hypot(player.pos.x-exitPos.x,player.pos.z-exitPos.z);
   if(!onFloor2&&stDist<1.6&&stairCd<=0){
-    if(player.hasKey&&openedDoors>=100)climbStairs(false);
+    /* v12.3c: Владыка охраняет лестницу — пока жив, наверх не пройти */
+    const vg=enemies.find(e=>e.kind==='bossGhost'&&!e.dead);
+    if(vg){
+      if(exitMsgCd<=0){exitMsgCd=3;
+        msg(`⛓ ${vg.name} ПРЕГРАЖДАЕТ ЛЕСТНИЦУ! Убей его на ТРОНЕ ВЛАДЫКИ (арена за залом 100)!`,'#e08ae0');
+        sRattle(); vib(40);
+      }
+    }
+    else if(player.hasKey&&openedDoors>=100)climbStairs(false);
     else if(exitMsgCd<=0){exitMsgCd=3;
       if(!player.hasKey)msg('⛓ Лестница заперта магией! Нужен золотой ключ!','#e07a7a');
       else msg(`⛓ Барьер держит лестницу! Открой ВСЕ 100 дверей этажа (осталось ${100-openedDoors})`,'#e07a7a');
