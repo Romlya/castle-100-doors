@@ -187,6 +187,12 @@
      <b style="color:#b0a8e0">двойники</b> зеркалят движения, <b style="color:#8aff8a">слизни</b> делятся надвое,
      <b style="color:#c8a03a">автоматоны</b> блокируют удар щитом. С тварей этажа 2 падают <b style="color:#9ad8ff">👻 ДУШИ</b> —
      новая валюта!
+     <b style="color:#e08ae0">v12.3:</b> ПЯТЬ БОССОВ — у каждого СВОЯ ОГРОМНАЯ АРЕНА, вырезанная в скале под замком:
+     <b>АРЕНА КОМАНДОРА</b> (зал 50), <b>ТРОН ВЛАДЫКИ</b> (зал 100), а на этаже 2 —
+     <b style="color:#ffb0a0">ГНЕЗДО КОРОЛЕВЫ ГАРПИЙ</b> (дверь 130, зовёт гарпий),
+     <b style="color:#7affb0">НЕКРОПОЛИС ЛИЧА</b> (дверь 165, мигает сквозь тьму и метает тройную магию) и
+     <b style="color:#ffa030">ВОРОТА ГОЛЕМА-СТРАЖА</b> (дверь 199, ярость по порогам HP).
+     Столбы света над аренами видно издалека, вход сопровождает рёв, победа — фанфары!
      Убивай врагов — за 🪙 <b>пильгорцы</b> Мопс и Добрый Пилгор продают еду, зелья и оружие
      (<b>M</b> — лавка, <b>I</b> — инвентарь). Покупки <b>сохраняются</b> между заходами.
      За полное прохождение — 🪙 <b>+200</b>!
@@ -437,6 +443,43 @@ const KEY_SPOT=[keyRoom.x0+1,keyRoom.y0+1];
 /* v12: серебряный ключ — глубина второго этажа (залы ~165-176) */
 const keyRoom2=rooms[164+((Math.random()*12)|0)];
 const KEY2_SPOT=[keyRoom2.x0+1,keyRoom2.y0+1];
+
+/* ================== v12.3: АРЕНЫ БОССОВ (1 арена — 1 босс) ==================
+   Каждая арена — огромный вырезанный зал, соединённый с залом-хозяином
+   ОДНИМ коридором (цепочка дверей не нарушается: в арену можно попасть
+   только через зал-хозяин). Арены вырезаются ДО подсчёта floorCells,
+   поэтому пол/потолок (глобальные плоскости), спавн припасов и врагов
+   достаются аренам автоматически. Декор строится позже (buildArenas). */
+const arenas=[];
+function carveArena(x0,y0,w,h,meta){
+  for(let y=y0;y<y0+h;y++)for(let x=x0;x<x0+w;x++)grid[y][x]=0;
+  const a=Object.assign({x0,y0,x1:x0+w-1,y1:y0+h-1,
+    gx:x0+((w-1)/2|0),gy:y0+((h-1)/2|0),
+    cx:wx(x0+(w-1)/2),cz:wx(y0+(h-1)/2),entered:false},meta||{});
+  arenas.push(a); return a;
+}
+/* АРЕНА КОМАНДОРА ТЬМЫ — зал 50, узкий коридор на восток, гигантский зал снизу */
+carveArena(40,22,1,1);                       // связь с залом 50
+carveArena(41,22,1,26);                      // коридор (y22..47)
+carveArena(22,48,21,17,{boss:'bossKnight',name:'АРЕНА КОМАНДОРА',beamC:0xff4a4a});
+/* ТРОН ВЛАДЫКИ — зал 100, шахта вниз */
+carveArena(2,44,1,4);
+carveArena(1,48,18,23,{boss:'bossGhost',name:'ТРОН ВЛАДЫКИ',beamC:0xb04ae0});
+/* ГНЕЗДО КОРОЛЕВЫ ГАРПИЙ — зал 130 (этаж 2), коридор на восток */
+carveArena(85,10,1,1);
+carveArena(86,10,1,38);                      // коридор (y10..47)
+carveArena(66,48,23,17,{boss:'queen',name:'ГНЕЗДО КОРОЛЕВЫ',beamC:0xffb060});
+/* НЕКРОПОЛИС ЛИЧА — зал 161 (этаж 2), коридор на запад с отводом */
+carveArena(44,26,1,1);
+carveArena(45,26,1,1);
+carveArena(43,26,1,22);                      // коридор (y26..47)
+carveArena(44,47,1,1); carveArena(45,47,1,1); carveArena(46,47,1,1); // отвод в зал
+carveArena(46,48,15,17,{boss:'lich',name:'НЕКРОПОЛИС ЛИЧА',beamC:0x7affb0});
+/* ВОРОТА ГОЛЕМА-СТРАЖА — зал 199 (этаж 2), шахта вниз и галерея на восток */
+carveArena(51,40,1,7);                       // шахта (y40..46)
+carveArena(52,46,11,1);                      // галерея (x52..62)
+carveArena(62,47,1,21);                      // спуск (y47..67)
+carveArena(56,68,9,18,{boss:'golemGuard',name:'ВОРОТА ГОЛЕМА',beamC:0xffa030});
 
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;
 };
@@ -1320,7 +1363,56 @@ function dropSouls(px,pz,lo,hi){
     g.position.set(px+(Math.random()-0.5)*0.8,0.35,pz+(Math.random()-0.5)*0.8);
     scene.add(g); items.push({mesh:g,type:'soul',val:1});
   }
-}placeItems();
+}
+/* v12.3: декор арен — цветной пол, кольцо факелов, столбы-черепа, столб света */
+const arenaBeams=[];
+function buildArenas(){
+  for(const ar of arenas){
+    if(!ar.name)continue;
+    const w=(ar.x1-ar.x0+1)*S, h=(ar.y1-ar.y0+1)*S;
+    /* тонированный каменный пол арены */
+    const patch=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+      new THREE.MeshBasicMaterial({color:ar.beamC,transparent:true,opacity:0.10,depthWrite:false}));
+    patch.rotation.x=-Math.PI/2;
+    patch.position.set(ar.cx,0.02,ar.cz);
+    scene.add(patch);
+    /* столб света над ареной — видно издалека */
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,26,8,1,true),
+      new THREE.MeshBasicMaterial({color:ar.beamC,transparent:true,opacity:0.22,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+    beam.position.set(ar.cx,13,ar.cz);
+    scene.add(beam);
+    ar.beam=beam; arenaBeams.push(beam);
+    /* кольцо факелов по периметру */
+    const per=2*(w+h)/S|0, n=Math.max(8,Math.min(20,per/3|0));
+    for(let ti=0;ti<n;ti++){
+      const ta=ti/n*Math.PI*2;
+      const rx=Math.cos(ta)*(w/2-1.2), rz=Math.sin(ta)*(h/2-1.2);
+      const fx=ar.cx+rx, fz=ar.cz+rz;
+      if(solid(Math.floor((fx-OR)/S),Math.floor((fz-OR)/S)))continue;
+      const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:ar.beamC,transparent:true,opacity:0.65,depthWrite:false,blending:THREE.AdditiveBlending}));
+      glow.scale.set(1.6,1.6,1); glow.position.set(fx,1.7,fz);
+      scene.add(glow);
+    }
+    /* четыре столба-черепа по углам */
+    for(const [sx,sz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+      const px2=ar.cx+sx*(w/2-2.2), pz2=ar.cz+sz*(h/2-2.2);
+      if(solid(Math.floor((px2-OR)/S),Math.floor((pz2-OR)/S)))continue;
+      const pil=new THREE.Group();
+      const stone=new THREE.MeshLambertMaterial({color:0x5a5a62});
+      const col=new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.42,2.6,7),stone); col.position.y=1.3;
+      const skull=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8),new THREE.MeshLambertMaterial({color:0xc8c0a8}));
+      skull.position.y=2.85; skull.scale.set(1,0.85,1.1);
+      const eyeM=new THREE.MeshBasicMaterial({color:ar.beamC});
+      const se1=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6),eyeM); se1.position.set(-0.11,2.9,0.26);
+      const se2=se1.clone(); se2.position.x=0.11;
+      pil.add(col,skull,se1,se2);
+      pil.position.set(px2,0,pz2);
+      scene.add(pil);
+    }
+  }
+}
+placeItems();
+buildArenas(); // v12.3: декор арен строится после сцены
 loadStep(88,'Выпускаем монстров…'); await tick();
 
 /* ---------- выход: v12 — это теперь ВЕЛИКАЯ ЛЕСТНИЦА на второй этаж ---------- */
@@ -1672,6 +1764,10 @@ const ENEMY_STATS={
   automaton: {hp:80,  speed:2.3, dmg:14, atkCd:1.6, shield:true, name:'Шестерённый автоматон'}, // блокирует удар
   bossGhost: {hp:320, speed:2.7, dmg:20, atkCd:1.3, ghost:true, boss:true, name:'ВЛАДЫКА ЗАМКА'},
   bossKnight:{hp:240, speed:3.4, dmg:18, atkCd:1.2, boss:true, name:'КОМАНДОР ТЬМЫ'},
+  /* v12.3: боссы арен */
+  queen:     {hp:380, speed:3.0, dmg:16, atkCd:1.6, fly:true, boss:true, name:'КОРОЛЕВА ГАРПИЙ'},   // зовёт гарпий
+  lich:      {hp:420, speed:2.2, dmg:14, atkCd:1.8, boss:true, lich:true, name:'АРХИМАГ-ЛИЧ'},     // мигает, тройная магия
+  golemGuard:{hp:550, speed:1.8, dmg:26, atkCd:2.0, armor:0.6, boss:true, name:'ГОЛЕМ-СТРАЖ ВРАТ'}, // ярость по порогам HP
   kaver:     {hp:60,  speed:0,   dmg:9,  atkCd:1,   name:'Каверга'},
 };
 /* ---------- v12.1: ПЯТЬ НОВЫХ ВРАГОВ (модели v11.2-качества) ---------- */
@@ -1973,6 +2069,67 @@ function makeAutomaton(){
   g.userData.legs=[legL,legR]; g.userData.shield=shield; g.userData.gear=gear1;
   return g;
 }
+/* ---------- v12.3: МОДЕЛИ БОССОВ АРЕН ---------- */
+function makeQueen(){
+  /* КОРОЛЕВА ГАРПИЙ: гарпия-матриарх — золотое оперение, корона, шрамы */
+  const g=makeHarpy();
+  const gold=new THREE.MeshBasicMaterial({color:0xffd75e});
+  const crown=new THREE.Group();
+  for(let sp=0;sp<5;sp++){
+    const t=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.18,4),gold);
+    t.position.set(-0.12+sp*0.06,0.62,0.02); crown.add(t);
+  }
+  const band=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.03,6,12),gold);
+  band.rotation.x=Math.PI/2; band.position.y=0.55;
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.045,6,12),new THREE.MeshLambertMaterial({color:0x8a6a10}));
+  collar.rotation.x=Math.PI/2; collar.position.y=0.3;
+  g.add(crown,band,collar);
+  g.userData.crown=crown;
+  return g;
+}
+function makeLich(){
+  /* АРХИМАГ-ЛИЧ: парящий скелет-маг в истлевшей мантии, посох с кристаллом */
+  const g=new THREE.Group();
+  const robeM=new THREE.MeshLambertMaterial({color:0x2a2440});
+  const robeD=new THREE.MeshLambertMaterial({color:0x181430});
+  const glowM=new THREE.MeshBasicMaterial({color:0x7affb0});
+  const bone=new THREE.MeshLambertMaterial({color:0xd8d2b8});
+  const robe=new THREE.Mesh(new THREE.ConeGeometry(0.45,1.5,10),robeM); robe.position.y=0.75;
+  const hood=new THREE.Mesh(new THREE.SphereGeometry(0.28,10,10),robeD); hood.position.y=1.55; hood.scale.set(1,1.05,1);
+  const face=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),bone); face.position.set(0,1.45,0.1); face.scale.set(0.9,1,1);
+  const e1=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),glowM); e1.position.set(-0.08,1.47,0.24);
+  const e2=e1.clone(); e2.position.x=0.08;
+  const shoulder=new THREE.Mesh(new THREE.DodecahedronGeometry(0.14,0),robeD); shoulder.position.set(-0.3,1.35,0);
+  const shoulder2=shoulder.clone(); shoulder2.position.x=0.3;
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.12),robeM); arm.position.set(0.36,1.05,0.05); arm.rotation.x=-0.5;
+  /* посох с кристаллом-некрокостями */
+  const staff=new THREE.Group(); staff.position.set(0.42,0,0.05);
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.045,1.7,6),robeD); pole.position.y=0.85;
+  const orb=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8),glowM); orb.position.y=1.78;
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:torchGlowTex,color:0x7affb0,transparent:true,opacity:0.55,depthWrite:false,blending:THREE.AdditiveBlending}));
+  halo.scale.set(1.2,1.2,1); halo.position.y=1.78;
+  staff.add(pole,orb,halo);
+  g.add(robe,hood,face,e1,e2,shoulder,shoulder2,arm,staff);
+  g.userData.staff=staff; g.userData.orb=orb;
+  return g;
+}
+function makeGolemGuard(){
+  /* ГОЛЕМ-СТРАЖ ВРАТ: голем с рунным огнём и рогами-шпилями */
+  const g=makeGolem();
+  const runeM=new THREE.MeshBasicMaterial({color:0xffa030});
+  for(let rn=0;rn<5;rn++){
+    const r=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.2,0.02),runeM);
+    const ra=Math.random()*Math.PI*2;
+    r.position.set(Math.cos(ra)*0.45,0.9+Math.random()*0.4,Math.sin(ra)*0.45);
+    r.lookAt(0,r.position.y,0);
+    g.add(r);
+  }
+  const hornM=new THREE.MeshLambertMaterial({color:0x6a5a4a});
+  const h1=new THREE.Mesh(new THREE.ConeGeometry(0.09,0.42,5),hornM); h1.position.set(-0.2,1.8,0); h1.rotation.z=0.35;
+  const h2=h1.clone(); h2.position.x=0.2; h2.rotation.z=-0.35;
+  g.add(h1,h2);
+  return g;
+}
 function makeKaver(){
   /* КАВЕРГА-ГРЕМЛИН: сгорбленная, огромные уши, хвост, когти, зубастая ухмылка */
   const g=new THREE.Group();
@@ -2170,7 +2327,7 @@ function updateKaver(en,dt){
   }
 }
 const sScreech=()=>{beep(1400,250,0.45,'sawtooth',0.2);setTimeout(()=>beep(900,150,0.3,'square',0.15),180);};
-function spawnEnemy(kind,floor,mul=1){
+function spawnEnemy(kind,floor,mul=1,pos=null){
   const st=ENEMY_STATS[kind];
   /* v12: спавн на заданном этаже (1 — по умолчанию, 2 — готическое крыло) */
   const xMin=floor===2?FLOOR2:0, xMax=floor===2?G:FLOOR2;
@@ -2179,10 +2336,10 @@ function spawnEnemy(kind,floor,mul=1){
     const d=Math.hypot(wx(x)-player.pos.x,wx(y)-player.pos.z);
     return d>16&&!doorAt.has(x+'_'+y);
   }));
-  const [x,y]=cells[0]||[rooms[floor===2?130:30].x0+1,rooms[floor===2?130:30].y0+1];
+  const [x,y]=pos||cells[0]||[rooms[floor===2?130:30].x0+1,rooms[floor===2?130:30].y0+1];
   /* v12.1: мызырь приходит РОЕМ из трёх мышей, остальные — по одному */
   const count=kind==='bat'?3:1;
-  const flyY=kind==='harpy'?1.9:kind==='bat'?1.5:0;
+  const flyY=(kind==='harpy'||kind==='queen')?1.9:kind==='bat'?1.5:0;
   for(let si=0;si<count;si++){
     const mesh=st.ghost?(kind==='bossGhost'?makeBossGhost():(floor===2?makeGhost(true):makeGhost()))
       :kind==='kaver'?makeKaver()
@@ -2197,6 +2354,9 @@ function spawnEnemy(kind,floor,mul=1){
       :kind==='doppel'?makeDoppel()
       :kind==='slime'?makeSlime()
       :kind==='automaton'?makeAutomaton()
+      :kind==='queen'?makeQueen()
+      :kind==='lich'?makeLich()
+      :kind==='golemGuard'?makeGolemGuard()
       :(kind==='bossKnight'?makeBossKnight():makeKnight());
     mesh.position.set(wx(x)+(si?0.4*si:0),st.ghost?1.5:flyY,wx(y)+(si?0.3*si:0));
     if(kind==='pilgor')mesh.scale.setScalar(1.2);
@@ -2204,6 +2364,55 @@ function spawnEnemy(kind,floor,mul=1){
     if(kind==='bat')mesh.userData.swayPh=Math.random()*7; // фаза кружения роя
     if(st.boss){
       mesh.scale.setScalar(st.ghost?2.0:1.9);
+    }
+    /* v12.3: редизайн — фирменная деталь каждому врагу */
+    if(kind==='knight'||kind==='bossKnight'){ // плюмаж + боевой плащ
+      const plume=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.22,5),new THREE.MeshBasicMaterial({color:kind==='bossKnight'?0xff4a4a:0xc83a3a}));
+      plume.position.set(0,1.52,-0.06); plume.rotation.x=-0.5; mesh.add(plume);
+      const cape=new THREE.Mesh(new THREE.PlaneGeometry(0.52,0.78),new THREE.MeshLambertMaterial({color:kind==='bossKnight'?0x5a0a0a:0x3a1414,side:THREE.DoubleSide}));
+      cape.position.set(0,0.92,-0.2); cape.rotation.x=0.14; mesh.add(cape);
+    }else if(kind==='ghost'){ // рваная мантия-юбка
+      const skirt=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.5,8,1,true),new THREE.MeshLambertMaterial({color:0x30303e,transparent:true,opacity:0.55,side:THREE.DoubleSide}));
+      skirt.position.y=-0.7; skirt.rotation.x=Math.PI; mesh.add(skirt);
+    }else if(kind==='pilgor'){ // витые рога
+      const hornM=new THREE.MeshLambertMaterial({color:0xd8c8a0});
+      const h1=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.3,5),hornM); h1.position.set(-0.14,0.55,0); h1.rotation.z=0.5;
+      const h2=h1.clone(); h2.position.x=0.14; h2.rotation.z=-0.5;
+      mesh.add(h1,h2);
+    }else if(kind==='golem'){ // тусклые руны на панцире
+      const runeM=new THREE.MeshBasicMaterial({color:0xd88a30});
+      for(let rn=0;rn<3;rn++){
+        const r=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.02),runeM);
+        const ra=rn*2.1;
+        r.position.set(Math.cos(ra)*0.42,0.9+rn*0.15,Math.sin(ra)*0.42);
+        r.lookAt(0,r.position.y,0);
+        mesh.add(r);
+      }
+    }else if(kind==='harpy'){ // костяной воротник
+      const collar=new THREE.Mesh(new THREE.TorusGeometry(0.17,0.03,6,10),new THREE.MeshLambertMaterial({color:0xd8d0b0}));
+      collar.rotation.x=Math.PI/2; collar.position.y=0.3; mesh.add(collar);
+    }else if(kind==='monk'){ // чётки из костей
+      const beadM=new THREE.MeshLambertMaterial({color:0xd8d0b8});
+      for(let bd=0;bd<7;bd++){
+        const bead=new THREE.Mesh(new THREE.SphereGeometry(0.035,5,5),beadM);
+        const ba=bd/7*Math.PI*2;
+        bead.position.set(Math.cos(ba)*0.24,0.7,Math.sin(ba)*0.24);
+        mesh.add(bead);
+      }
+    }else if(kind==='archer'){ // колчан со стрелами за спиной
+      const quiver=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.42,6),new THREE.MeshLambertMaterial({color:0x4a3828}));
+      quiver.position.set(0.2,1.0,-0.18); quiver.rotation.z=0.4;
+      for(let aa=0;aa<3;aa++){
+        const arr=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.3,4),new THREE.MeshLambertMaterial({color:0xc8b890}));
+        arr.position.set(0.16+aa*0.04,1.28,-0.2);
+        mesh.add(arr);
+      }
+      mesh.add(quiver);
+    }else if(kind==='bat'){ // кожистые ушки
+      const earM=new THREE.MeshLambertMaterial({color:0x2a2024});
+      const eL=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.14,4),earM); eL.position.set(-0.07,0.5,0); eL.rotation.z=0.3;
+      const eR=eL.clone(); eR.position.x=0.07; eR.rotation.z=-0.3;
+      mesh.add(eL,eR);
     }
     scene.add(mesh);
     enemies.push({kind,mesh,hp:Math.round(st.hp*mul),maxHp:Math.round(st.hp*mul),speed:st.speed,dmg:st.dmg*mul,atkCd:st.atkCd,
@@ -2215,11 +2424,14 @@ function spawnEnemy(kind,floor,mul=1){
     e.state='hidden'; e.mesh.visible=false; e.hauntT=75; e.tauntT=120; // v12.0b: в 3 раза реже
   }
 }
-function spawnBoss(kind){
-  spawnEnemy(kind);
+function spawnBoss(kind,px,pz){
+  /* v12.3: босс заспавнится в ЦЕНТРЕ СВОЕЙ АРЕНЫ (1 арена — 1 босс) */
+  const ar=arenas.find(a=>a.boss===kind);
+  const cell=px!==undefined?[px,pz]:(ar?[ar.gx,ar.gy]:null);
+  if(cell)spawnEnemy(kind,cellFloor2(cell[0])?2:1,1,cell); else spawnEnemy(kind);
   const b=enemies[enemies.length-1];
   sHorn(); sBossRoar(1); // v11.1: рёв пробудившегося босса
-  msg(`⚔ ${b.name} ПРОБУДИЛСЯ! (${b.hp} HP)`,'#e08ae0');
+  msg(`⚔ ${b.name} ПРОБУДИЛСЯ${ar?' В '+ar.name:''}! (${b.hp} HP)`,'#e08ae0');
 }
 function dropLoot(px,pz){
   const breadMat=new THREE.MeshLambertMaterial({color:0xb5813f});
@@ -2622,6 +2834,13 @@ const sDoppelWhisper=(a=1)=>{beep(500,450,0.25,'sine',0.07*a);setTimeout(()=>bee
 const sSlimeGurgle=(a=1)=>{beep(140,90,0.22,'sine',0.11*a);setTimeout(()=>beep(110,70,0.2,'sine',0.09*a),180);};
 const sGearSpin=(a=1)=>{beep(1500,1300,0.12,'square',0.07*a);setTimeout(()=>beep(1300,1500,0.12,'square',0.06*a),130);};
 const sSoulPick=(a=1)=>{beep(1200,1800,0.2,'sine',0.08*a);setTimeout(()=>beep(1500,2200,0.18,'sine',0.06*a),120);};
+/* v12.3: голоса боссов арен + озвучка интерфейса */
+const sLichCast=(a=1)=>{beep(300,900,0.3,'sawtooth',0.12*a);setTimeout(()=>beep(900,200,0.25,'sawtooth',0.1*a),260);};
+const sSummon=(a=1)=>{beep(500,1200,0.25,'triangle',0.1*a);setTimeout(()=>beep(700,1400,0.2,'triangle',0.08*a),200);};
+const sClick=()=>beep(700,500,0.06,'square',0.08);
+const sBuy=()=>{beep(600,900,0.1,'sine',0.12);setTimeout(()=>beep(900,1300,0.12,'sine',0.1),100);};
+const sFanfare=()=>{beep(392,392,0.15,'square',0.14);setTimeout(()=>beep(523,523,0.15,'square',0.14),160);
+  setTimeout(()=>beep(659,659,0.15,'square',0.14),320);setTimeout(()=>beep(784,784,0.3,'square',0.16),480);};
 const sGiggle=(a=1)=>{beep(1300,1100,0.07,'square',0.09*a);setTimeout(()=>beep(1150,950,0.07,'square',0.08*a),90);setTimeout(()=>beep(1000,760,0.12,'square',0.08*a),180);};
 const sBell=(a=1)=>beep(1500,900,0.25,'sine',0.09*a);
 const sSadBleat=(a=1)=>beep(340,120,0.55,'sawtooth',0.18*a);
@@ -2699,6 +2918,7 @@ const DIFFS={
 let diff=DIFFS.normal;
 document.querySelectorAll('.diffbtn').forEach(b=>{
   b.onclick=()=>{
+    sClick(); // v12.3: озвучка интерфейса
     diff=DIFFS[b.dataset.d];
     document.querySelectorAll('.diffbtn').forEach(x=>x.classList.toggle('sel',x===b));
     $('diffdesc').textContent=diff.desc;
@@ -2707,7 +2927,7 @@ document.querySelectorAll('.diffbtn').forEach(b=>{
 /* настройки */
 {
   const sb=$('settingsBtn'),box=$('settingsBox');
-  sb.onclick=()=>box.classList.toggle('hidden');
+  sb.onclick=()=>{sClick();box.classList.toggle('hidden');};
   const sr=$('sensRange'),vr=$('volRange'),iy=$('invY'),lg=$('lightGfx');
   sr.value=settings.sens; vr.value=settings.volume; iy.checked=settings.invY; lg.checked=!!settings.lightGfx;
   $('sensval').textContent=(+settings.sens).toFixed(1);
@@ -2731,7 +2951,7 @@ addEventListener('keyup',e=>keys[e.code]=false);
 document.addEventListener('visibilitychange',clearKeys);
 let locked=false, running=false, dead=false, won=false, revivesUsed=0;
 
-$('startBtn').onclick=()=>{ $('startOv').classList.add('hidden'); gameStarted=true; startRunning(); };
+$('startBtn').onclick=()=>{ sClick(); $('startOv').classList.add('hidden'); gameStarted=true; startRunning(); };
 /* v12.0b: обработчики экрана входа */
 $('loginBtn').onclick=doLogin;
 $('regBtn').onclick=doRegister;
@@ -2740,9 +2960,10 @@ $('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 $('loginName').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 $('pLogoutBtn').onclick=doLogout;
 /* v12.1b: достижения + вход сразу на этаж 2 */
-$('achBtn').onclick=()=>{renderAchs();$('achOv').classList.remove('hidden');};
-$('achClose').onclick=()=>$('achOv').classList.add('hidden');
+$('achBtn').onclick=()=>{sClick();renderAchs();$('achOv').classList.remove('hidden');};
+$('achClose').onclick=()=>{sClick();$('achOv').classList.add('hidden');};
 $('floor2Btn').onclick=()=>{
+  sClick();
   pendingFloor2=true;
   $('startOv').classList.add('hidden');
   $('achOv').classList.add('hidden');
@@ -2773,6 +2994,7 @@ function startRunning(){
 }
 addEventListener('keydown',e=>{
   if(e.code==='KeyP'&&running&&!dead&&!won){
+    sClick(); // v12.3: озвучка паузы
     running=false; clearKeys(); document.exitPointerLock&&document.exitPointerLock();
     renderMenuStats(); // v11.4: прогресс в паузе
     $('pauseOv').classList.remove('hidden');
@@ -2946,9 +3168,11 @@ function swingSword(){
     const to=new THREE.Vector3(en.mesh.position.x-player.pos.x,0,en.mesh.position.z-player.pos.z);
     const d=to.length();
     if(d<W.range&&to.normalize().dot(new THREE.Vector3(fwd.x,0,fwd.z).normalize())>W.dot){
-      /* v12.1: броня голема глушит половину урона, и он тяжёлый — почти не отбрасывается */
-      const kn=en.kind==='golem'?0.25:0.9;
-      en.hp-=(en.kind==='golem'&&ENEMY_STATS.golem.armor)?W.dmg*(1-ENEMY_STATS.golem.armor):W.dmg;
+      /* v12.1: броня голема/стража глушит часть урона, и они тяжёлые — почти не отбрасываются */
+      const heavy=en.kind==='golem'||en.kind==='golemGuard';
+      const kn=heavy?0.25:0.9;
+      const stA=ENEMY_STATS[en.kind]&&ENEMY_STATS[en.kind].armor;
+      en.hp-=stA?W.dmg*(1-stA):W.dmg;
       sHit();
       moveWithCollision(en.mesh.position,0.45,fwd.x*kn,fwd.z*kn,true,en.boss,en.kind==='ghost');
       if(en.hp<=0)killEnemy(en);
@@ -3045,7 +3269,7 @@ const arrows=[];
 /* v12.2: лужи огня элементалей + зеркало движения игрока для Двойника */
 const firePuddles=[];
 let prevPX=null,prevPZ=null,pMoveX=0,pMoveZ=0;
-function shootArrow(en,dx,dz){
+function shootArrow(en,dx,dz,label){
   const g=new THREE.Group();
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.55,5),new THREE.MeshLambertMaterial({color:0x8a7a5a}));
   shaft.rotation.x=Math.PI/2;
@@ -3056,7 +3280,7 @@ function shootArrow(en,dx,dz){
   g.position.set(p.x,1.1,p.z);
   g.rotation.y=Math.atan2(dx,dz);
   scene.add(g);
-  arrows.push({m:g,vx:dx*9.5,vz:dz*9.5,dmg:en.dmg,t:0});
+  arrows.push({m:g,vx:dx*9.5,vz:dz*9.5,dmg:en.dmg,t:0,label});
   beep(400,900,0.12,'square',0.1); // тук — тетива
 }
 
@@ -3066,6 +3290,7 @@ function killEnemy(en){
   player.kills=(player.kills||0)+1;
   if(player.kills>=25)unlockAch('kills');
   if(en.kind==='golem')unlockAch('golem');
+  if(en.kind==='golemGuard')unlockAch('golem');
   if(en.boss)unlockAch('boss');
   /* v11.1: предсмертный голос врага (громкость по дистанции) */
   const da=distAtt(Math.hypot(player.pos.x-en.mesh.position.x,player.pos.z-en.mesh.position.z));
@@ -3084,6 +3309,9 @@ function killEnemy(en){
   else if(en.kind==='doppel')sDoppelWhisper(da);
   else if(en.kind==='slime'){sSlimeGurgle(da);setTimeout(()=>sSlimeGurgle(da*0.7),200);}
   else if(en.kind==='automaton'){sClank(da);setTimeout(()=>sGearSpin(da*0.7),160);}
+  else if(en.kind==='queen'){sHarpyShriek(da);setTimeout(()=>sBossRoar(da*0.8),200);}
+  else if(en.kind==='lich'){sLichCast(da);setTimeout(()=>beep(200,60,0.5,'sawtooth',0.18*da),300);}
+  else if(en.kind==='golemGuard'){sGolemRumble(da);setTimeout(()=>beep(70,28,0.6,'square',0.24*da),250);}
   /* v12.2: СЛИЗЕНЬ ДЕЛИТСЯ НАДВОЕ (один раз) */
   if(en.kind==='slime'&&!en.split&&spawned){
     for(let sp2=0;sp2<2;sp2++){
@@ -3103,7 +3331,8 @@ function killEnemy(en){
   else if(isFloor2(en.mesh.position.x)&&en.boss)dropSouls(en.mesh.position.x,en.mesh.position.z,8,12);
   if(en.boss){
     msg(`💀 ${en.name} ПОВЕРЖЕН! Он выронил припасы, аптечку и горсть пильгорцев!`,'#7ae07a');
-    sKey();
+    sFanfare(); // v12.3: фанфары победы над боссом арены
+    vib([80,60,80,60,200]);
     dropLoot(en.mesh.position.x,en.mesh.position.z);
     dropMed(en.mesh.position.x,en.mesh.position.z);
     dropCoins(en.mesh.position.x,en.mesh.position.z,13,20); // босс: 26-40
@@ -3135,6 +3364,12 @@ function killEnemy(en){
     msg('🧪 Слизень растёкся лужей.','#8aff8a');
   } else if(en.kind==='automaton'){
     msg('⚙ Автоматон развалился на шестерни!','#c8a03a');
+  } else if(en.kind==='queen'){
+    msg('👑 Королева гарпий повержена — гнездо осиротело!','#ffb0a0');
+  } else if(en.kind==='lich'){
+    msg('☠ Архимаг-лич развеян — некрополис погас!','#7affb0');
+  } else if(en.kind==='golemGuard'){
+    msg('🚪 Голем-страж рассыпался — врата свободны!','#ffa030');
   } else {
     msg(en.kind==='ghost'?'Призрак развеян!':'Рыцарь повержен!','#9fd0ff');
   }
@@ -3166,7 +3401,11 @@ addEventListener('keydown',e=>{
       if(openedDoors===25)unlockAch('door25');
       if(openedDoors===50)unlockAch('door50');
       if(openedDoors===100)unlockAch('door100');
-      if(openedDoors===50)spawnBoss('bossKnight'); // босс на середине пути
+      if(openedDoors===50)spawnBoss('bossKnight'); // босс на середине пути — ждёт в АРЕНЕ КОМАНДОРА
+      /* v12.3: боссы арен Готического крыла */
+      if(openedDoors===130)spawnBoss('queen');
+      if(openedDoors===165)spawnBoss('lich');
+      if(openedDoors===199)spawnBoss('golemGuard');
       if(d.trap&&!d.triggered){
         if(d.trap==='spike'){ d.spike=makeSpikes(d.gx,d.gy); d.spike.visible=true; }
         if(d.trap==='gas'){ d.gas=makeGas(d.gx,d.gy); }
@@ -3274,7 +3513,7 @@ function buyGood(id){
   if(id==='pil'&&player.hasPilFriend)return;
   if((id==='axe'||id==='spear')&&player.weapons.includes(id))return;
   if(player.coins<g.cost){msg('🪙 Не хватает пильгорцев! Убивай пилгоров!','#e07a7a');sHurt();return;}
-  player.coins-=g.cost; sKey(); vib(60);
+  player.coins-=g.cost; sBuy(); vib(60); // v12.3: звук покупки
   if(id==='bread'){player.food=Math.min(100,player.food+30);msg('🍞 Мопс отдал тебе хлеб. Приятного!','#e0a94b');}
   else if(id==='water'){player.water=Math.min(100,player.water+35);msg('💧 Добрый Пилгор налил тебе воды из фонтана.','#4ba7e0');}
   else if(id==='med'){player.medkits++;msg('💊 Аптечка убрана в сумку (инвентарь — I).','#ff7a7a');}
@@ -3292,6 +3531,7 @@ function buyGood(id){
 function openShop(){
   if(dead||won)return;
   if(invOpen)closeInv(true);
+  sClick(); // v12.3: озвучка интерфейса
   shopOpen=true; running=false; manualUnlock=true;
   document.exitPointerLock&&document.exitPointerLock();
   renderMenuStats(); // v11.4: обновить плашки меню/паузы
@@ -3299,6 +3539,7 @@ function openShop(){
   $('shopOv').classList.remove('hidden');
 }
 function closeShop(resume){
+  sClick();
   shopOpen=false;
   $('shopOv').classList.add('hidden');
   renderMenuStats(); // v11.4: покупки видны в меню
@@ -3326,18 +3567,20 @@ function renderInv(){
     renderInv();
   };
   $('invContent').querySelectorAll('button[data-w]').forEach(b=>{
-    b.onclick=()=>{ setWeapon(b.dataset.w); renderInv(); };
+    b.onclick=()=>{ sClick(); setWeapon(b.dataset.w); renderInv(); };
   });
 }
 function openInv(){
   if(dead||won)return;
   if(shopOpen)closeShop(true);
+  sClick(); // v12.3: озвучка интерфейса
   invOpen=true; running=false; manualUnlock=true;
   document.exitPointerLock&&document.exitPointerLock();
   renderInv();
   $('invOv').classList.remove('hidden');
 }
 function closeInv(resume){
+  sClick();
   invOpen=false;
   $('invOv').classList.add('hidden');
   if(resume!==false&&!dead&&!won&&gameStarted)startRunning();
@@ -3717,6 +3960,19 @@ function update(dt){
   if(prevPX!==null){pMoveX=player.pos.x-prevPX; pMoveZ=player.pos.z-prevPZ;}
   prevPX=player.pos.x; prevPZ=player.pos.z;
 
+  /* v12.3: пульс столбов света над аренами + вход на арену — рёв и баннер */
+  for(let ab=0;ab<arenaBeams.length;ab++){
+    arenaBeams[ab].material.opacity=0.16+Math.abs(Math.sin(gt*1.5+ab))*0.12;
+  }
+  for(const ar of arenas){
+    if(!ar.name||ar.entered)continue;
+    if(player.pos.x>=wx(ar.x0)-S/2&&player.pos.x<=wx(ar.x1)+S/2&&player.pos.z>=wx(ar.y0)-S/2&&player.pos.z<=wx(ar.y1)+S/2){
+      ar.entered=true;
+      sBossRoar(1); vib([60,80,60,80,120]);
+      msg(`⚔ ТЫ ВОШЁЛ: ${ar.name}! Стены помнят каждого, кто дерзил...`,'#e08ae0');
+    }
+  }
+
   /* v12.1: стрелы лучников летят, вонзаются в стены и в игрока */
   for(let i=arrows.length-1;i>=0;i--){
     const ar=arrows[i];
@@ -3725,7 +3981,7 @@ function update(dt){
     ar.m.rotation.y=Math.atan2(ar.vx,ar.vz);
     const gx=Math.floor((ar.m.position.x-OR)/S), gy=Math.floor((ar.m.position.z-OR)/S);
     if(Math.hypot(player.pos.x-ar.m.position.x,player.pos.z-ar.m.position.z)<0.55&&player.pos.y<2.1&&!playerInSafe){
-      damage(ar.dmg*diff.dmg,'Скелет-лучник пронзил тебя стрелой!');
+      damage(ar.dmg*diff.dmg,ar.label||'Скелет-лучник пронзил тебя стрелой!');
       ar.t=9;
     }else if(solid(gx,gy,true,false,false)){sClank(0.35);ar.t=9;}
     if(ar.t>2.2){scene.remove(ar.m);arrows.splice(i,1);}
@@ -3775,6 +4031,9 @@ function update(dt){
         else if(en.kind==='doppel')sDoppelWhisper(va);
         else if(en.kind==='slime')sSlimeGurgle(va);
         else if(en.kind==='automaton')sGearSpin(va);
+        else if(en.kind==='queen')sHarpyShriek(va);
+        else if(en.kind==='lich')sLichCast(va);
+        else if(en.kind==='golemGuard'){sGolemRumble(va);setTimeout(()=>beep(80,35,0.25,'square',0.2*va),180);}
         else if(en.kind==='knight'||en.kind==='bossKnight')sKnightGrowl(va);
         else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*va);
         else if(en.kind==='bossGhost')sBossRoar(va);
@@ -3799,6 +4058,9 @@ function update(dt){
       else if(en.kind==='doppel')sDoppelWhisper(ia);
       else if(en.kind==='slime')sSlimeGurgle(ia);
       else if(en.kind==='automaton')sGearSpin(ia);
+      else if(en.kind==='queen')sHarpyShriek(ia*0.7);
+      else if(en.kind==='lich')sLichCast(ia*0.7);
+      else if(en.kind==='golemGuard')sGolemRumble(ia*0.7);
       else if(en.kind==='knight')sKnightGrowl(ia);
       else if(en.kind==='pilgor')beep(320,260,0.28,'sawtooth',0.2*ia);
       else if(en.kind==='bossGhost')sBossRoar(ia*0.8);
@@ -3881,8 +4143,65 @@ function update(dt){
       }
     }
 
-    /* v12.1: ГАРПИЯ — кружит над жертвой и ПИКИРУЕТ когтями */
-    if(en.kind==='harpy'){
+    /* v12.3: АРХИМАГ-ЛИЧ — парит, мигает сквозь тьму и метает ТРОЙНУЮ магию */
+    if(en.kind==='lich'){
+      if(en.blinkCd===undefined)en.blinkCd=4;
+      en.blinkCd-=dt;
+      if(dist<4.5&&en.blinkCd<=0&&!playerInSafe){
+        en.blinkCd=5;
+        for(let bt=0;bt<10;bt++){
+          const ba=Math.random()*Math.PI*2, br=6+Math.random()*3;
+          const bx2=en.mesh.position.x+Math.cos(ba)*br, bz2=en.mesh.position.z+Math.sin(ba)*br;
+          if(!solid(Math.floor((bx2-OR)/S),Math.floor((bz2-OR)/S))){
+            en.mesh.position.set(bx2,0.4,bz2);
+            sIceWhisper(0.8);
+            msg('🌀 ЛИЧ мигнул сквозь тьму!','#7affb0');
+            break;
+          }
+        }
+        continue;
+      }
+      if(en.state==='chase'&&en.cd<=0&&dist<13&&!playerInSafe&&player.pos.y<2.2&&los(ex,ez,player.pos.x,player.pos.z)){
+        en.cd=en.atkCd;
+        const dd=Math.max(dist,0.1), dx=(player.pos.x-ex)/dd, dz=(player.pos.z-ez)/dd;
+        const spr=0.22;
+        shootArrow(en,dx,dz,'Лич испепелил тебя тёмной магией!');
+        shootArrow(en,dx*Math.cos(spr)-dz*Math.sin(spr),dx*Math.sin(spr)+dz*Math.cos(spr),'Лич испепелил тебя тёмной магией!');
+        shootArrow(en,dx*Math.cos(-spr)-dz*Math.sin(-spr),dx*Math.sin(-spr)+dz*Math.cos(-spr),'Лич испепелил тебя тёмной магией!');
+        sLichCast(distAtt(dist));
+        continue;
+      }
+    }
+
+    /* v12.3: ГОЛЕМ-СТРАЖ ВРАТ — впадает в ярость по порогам HP */
+    if(en.kind==='golemGuard'){
+      if(en.rage===undefined)en.rage=0;
+      const frac=en.hp/en.maxHp;
+      if(frac<0.3&&en.rage<2){
+        en.rage=2; en.speed=ENEMY_STATS.golemGuard.speed*1.5; en.dmg=ENEMY_STATS.golemGuard.dmg*1.25;
+        sGolemRumble(1); msg('🌋 ГОЛЕМ-СТРАЖ ВПАЛ В ЯРОСТЬ! Камень плавится!','#ff7a5a');
+      }else if(frac<0.6&&en.rage<1){
+        en.rage=1; en.speed=ENEMY_STATS.golemGuard.speed*1.25;
+        sGolemRumble(0.8); msg('🔥 Голем-страж разогнался — руны вспыхнули!','#ff9a5a');
+      }
+    }
+
+    /* v12.1: ГАРПИЯ — кружит над жертвой и ПИКИРУЕТ когтями (v12.3: и КОРОЛЕВА ГАРПИЙ) */
+    if(en.kind==='harpy'||en.kind==='queen'){
+      /* v12.3: Королева каждые 12 с зовёт гарпий из гнезда (до 4 живых) */
+      if(en.kind==='queen'){
+        if(en.sumCd===undefined)en.sumCd=8;
+        en.sumCd-=dt;
+        if(en.sumCd<=0){
+          en.sumCd=12;
+          const hAlive=enemies.filter(x=>x.kind==='harpy'&&!x.dead).length;
+          if(hAlive<4){
+            spawnEnemy('harpy',2,1.35,[Math.round((en.mesh.position.x-OR)/S),Math.round((en.mesh.position.z-OR)/S)]);
+            sSummon(0.9);
+            msg('👑 Королева гарпий ЗОВЁТ СВОЁ ГНЕЗДО!','#ffb0a0');
+          }
+        }
+      }
       if(en.state==='swoop'){
         en.swoopT-=dt;
         const step=8.2*dt;
@@ -3990,10 +4309,15 @@ function update(dt){
         else if(en.kind==='doppel')sDoppelWhisper(va);
         else if(en.kind==='slime')sSlimeGurgle(va);
         else if(en.kind==='automaton'){sClank(va);setTimeout(()=>sGearSpin(va),100);}
+        else if(en.kind==='queen')sHarpyShriek(va);
+        else if(en.kind==='lich')sLichCast(va);
+        else if(en.kind==='golemGuard'){sGolemRumble(va);setTimeout(()=>beep(80,35,0.25,'square',0.22*va),160);}
         else {sClank(va);setTimeout(()=>sKnightGrowl(va),100);}
         en.swing=1;
         const WHY={knight:'Рыцарь зарубил тебя своим мечом...',monk:'Гнилой монах коснулся тебя — гниль расползается...',
           golem:'Голем раздавил тебя каменным кулаком...',harpy:'Гарпия раскромсала тебя когтями...',
+          queen:'Королева гарпий раскромсала тебя когтищами...',lich:'Лич испепелил тебя чёрным пламенем...',
+          golemGuard:'Голем-страж раздавил тебя вратами судьбы...',
           elemental:'Пламенный элементаль испепелил тебя...',iceGhost:'Ледяной призрак заморозил тебя...',
           doppel:'Двойник отразил твою же ярость...',slime:'Слизень растворил тебя в себе...',
           automaton:'Автоматон раздавил тебя латунным кулаком...'};
@@ -4033,9 +4357,14 @@ function update(dt){
     const legs=en.mesh.userData&&en.mesh.userData.legs;
     if(legs){
       const v=Math.hypot(en.mesh.position.x-oldx,en.mesh.position.z-oldz)/Math.max(dt,1e-4);
-      const sw=Math.min(1,v/3)*0.6;
+      /* v12.3: очень плавные ноги — скорость сглаживается (en.smSpd), без дёрганья */
+      en.smSpd=(en.smSpd||0)+(v-(en.smSpd||0))*Math.min(1,dt*6);
+      const sw=Math.min(1,en.smSpd/3)*0.6;
       legs[0].rotation.x=Math.sin(en.t*10)*sw;
       legs[1].rotation.x=-Math.sin(en.t*10)*sw;
+      /* v12.3: мягкое покачивание корпуса у ходячих (не летунов и не призраков) */
+      const stA2=ENEMY_STATS[en.kind];
+      if(stA2&&!stA2.ghost&&!stA2.fly&&en.kind!=='lich')en.mesh.position.y=Math.abs(Math.sin(en.t*10))*0.06*sw;
     }
     /* v11.1: АНИМАЦИИ ВРАГОВ */
     en.swing=Math.max(0,(en.swing||0)-dt*2.6);
@@ -4065,18 +4394,20 @@ function update(dt){
         const w=ud.wisps[wi], a=w.userData.a+en.t*1.6;
         w.position.set(Math.cos(a)*0.5,1.3+Math.sin(en.t*2.2+wi)*0.35,Math.sin(a)*0.5);
       }
-    }else if(en.kind==='harpy'){ // v12.1: взмахи крыльев, парение
+    }else if(en.kind==='harpy'||en.kind==='queen'){ // v12.1: взмахи крыльев, парение; v12.3: корона королевы
       if(ud.wings){ud.wings[0].rotation.z=Math.sin(en.t*10)*0.55;ud.wings[1].rotation.z=-Math.sin(en.t*10)*0.55;}
       if(en.state!=='swoop'&&en.state!=='climb')en.mesh.position.y=1.9+Math.sin(en.t*3.1)*0.18;
       en.mesh.rotation.z=Math.sin(en.t*5)*0.08;
+      if(en.kind==='queen'&&ud.crown)ud.crown.rotation.y=Math.sin(en.t*2)*0.25;
     }else if(en.kind==='bat'){ // v12.1: частые мелкие взмахи, порхание
       if(ud.wings){ud.wings[0].rotation.z=Math.sin(en.t*22)*0.7;ud.wings[1].rotation.z=-Math.sin(en.t*22)*0.7;}
       en.mesh.position.y=1.5+Math.sin(en.t*7)*0.25;
-    }else if(en.kind==='golem'){ // v12.1: кулаки-маятники, удар обеими руками
+    }else if(en.kind==='golem'||en.kind==='golemGuard'){ // v12.1: кулаки-маятники, удар обеими руками
       if(ud.arms){
         if(en.swing>0){const s=Math.sin((1-en.swing)*Math.PI);ud.arms[0].rotation.x=-s*1.5;ud.arms[1].rotation.x=-s*1.5;}
         else{ud.arms[0].rotation.x=Math.sin(en.t*2)*0.06;ud.arms[1].rotation.x=-Math.sin(en.t*2)*0.06;}
       }
+      if(en.kind==='golemGuard'&&en.rage>=2)en.mesh.rotation.z=Math.sin(en.t*14)*0.05; // дрожь ярости
     }else if(en.kind==='archer'){ // v12.1: натягивает лук при прицеливании
       if(ud.bowArm)ud.bowArm.rotation.x=en.state==='aim'?-0.45:0;
     }else if(en.kind==='monk'){ // v12.1: посох покачивается, гниль мерцает
@@ -4095,6 +4426,11 @@ function update(dt){
     }else if(en.kind==='automaton'){ // v12.2: шестерни крутятся, щит вращается
       if(ud.gear)ud.gear.rotation.z=en.t*3;
       if(ud.shield){ud.shield.visible=!!(en.shieldT>0);if(en.shieldT>0)ud.shield.rotation.z+=dt*9;}
+    }else if(en.kind==='lich'){ // v12.3: парение, кристалл-некрор пульсирует
+      en.mesh.position.y=0.25+Math.sin(en.t*1.8)*0.15;
+      en.mesh.rotation.z=Math.sin(en.t*1.2)*0.05;
+      if(ud.orb)ud.orb.scale.setScalar(1+Math.sin(en.t*6)*0.2);
+      if(ud.staff)ud.staff.rotation.z=Math.sin(en.t*1.3)*0.08;
     }else{
       en.mesh.position.y=0;
       if(en.kind==='pilgor'&&en.state!=='dash'&&en.state!=='stun')en.mesh.rotation.x=0;
