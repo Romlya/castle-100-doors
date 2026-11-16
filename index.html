@@ -262,6 +262,7 @@
 <div class="overlay hidden" id="loginOv">
   <h2>👤 ВХОД В ЗАМОК</h2>
   <p style="font-size:14px;color:#9a8ab0">Профили хранятся в этом браузере: у каждого свой кошелёк, рекорд и настройки.<br>
+     <b style="color:#8ae08a">Вход запоминается навсегда</b> — закрыл браузер, открыл: ты всё ещё в аккаунте! (Выход — кнопка в меню.)<br>
      Играешь один — просто жми «Играть без аккаунта».</p>
   <div class="loginrow">
     <label>Логин<input id="loginName" maxlength="16" autocomplete="username" placeholder="Рыцарь"></label>
@@ -2522,7 +2523,7 @@ function doLogin(){
   passHash(name,pass).then(h=>{
     if(p.h!==h)return bad('Неверный пароль.');
     currentUser=name;
-    try{sessionStorage.setItem(SESS_KEY,name);}catch(e){}
+    saveSession(name); // v12.3b: сессия постоянная — заново входить не нужно
     reloadProfile();
     loginFlowDone();
   });
@@ -2541,21 +2542,36 @@ function doRegister(){
     a[name]={h,wallet:null,best:null,set:null};
     saveAccounts(a);
     currentUser=name;
-    try{sessionStorage.setItem(SESS_KEY,name);}catch(e){}
+    saveSession(name); // v12.3b: сессия постоянная — заново входить не нужно
     reloadProfile();
     loginFlowDone();
     unlockAch('acc'); // v12.1b: ачивка за аккаунт (в блобе нового профиля)
   });
 }
+/* v12.3b: постоянная сессия (localStorage) — браузер закрыл, открыл — ты всё ещё в аккаунте.
+   Старые sessionStorage-сессии подхватываются при первом чтении и переносятся в localStorage. */
+function saveSession(name){
+  try{localStorage.setItem(SESS_KEY,name);}catch(e){}
+  try{sessionStorage.setItem(SESS_KEY,name);}catch(e){}
+}
+function readSession(){
+  try{const s=localStorage.getItem(SESS_KEY);if(s)return s;}catch(e){}
+  try{const s=sessionStorage.getItem(SESS_KEY);if(s){try{localStorage.setItem(SESS_KEY,s);}catch(e){}return s;}}catch(e){}
+  return null;
+}
+function clearSession(){
+  try{localStorage.removeItem(SESS_KEY);}catch(e){}
+  try{sessionStorage.removeItem(SESS_KEY);}catch(e){}
+}
 function doGuest(){
   currentUser=null;
-  try{sessionStorage.removeItem(SESS_KEY);}catch(e){}
+  clearSession();
   reloadProfile();
   loginFlowDone();
 }
 function doLogout(){
   currentUser=null;
-  try{sessionStorage.removeItem(SESS_KEY);}catch(e){}
+  clearSession();
   running=false; gameStarted=false; pendingFloor2=false;
   document.exitPointerLock&&document.exitPointerLock();
   for(const id of ['pauseOv','shopOv','invOv','startOv','deathOv','winOv','achOv']){
@@ -4626,7 +4642,7 @@ window.__markLoaded&&window.__markLoaded();
 /* v12.0b: СТОРОЖ показал loginOv — теперь решаем: автовход по сессии или экран входа */
 {
   let sn=null;
-  try{sn=sessionStorage.getItem(SESS_KEY);}catch(e){}
+  try{sn=readSession();}catch(e){} // v12.3b: постоянный автологин
   const accs=loadAccounts();
   if(sn&&accs[sn]){
     currentUser=sn;
