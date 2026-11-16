@@ -197,6 +197,9 @@
      <b>🔨 МОЛОТ РУН</b> (70 урона, отбрасывает), <b>🏹 ЛУК ДУШ</b> (стреляет на расстоянии) и
      <b>🗡🗡 ПАРНЫЕ КЛИНКИ</b> (самый быстрый удар). По замку спрятаны <b>📦 СУНДУКИ</b> —
      души и пильгорцы внутри!
+     <b style="color:#8ae08a">v12.5:</b> враги стали ЖИВЫМИ — плавные повороты, «дыхание» моделей и
+     мягкие атаки, а на телефоне игра больше не лагает: далёкие враги почти не тратят силы,
+     загрузка стала терпеливее, фейковых сбоев «Замок не открылся» больше нет.
      Убивай врагов — за 🪙 <b>пильгорцы</b> Мопс и Добрый Пилгор продают еду, зелья и оружие
      (<b>M</b> — лавка, <b>I</b> — инвентарь). Покупки <b>сохраняются</b> между заходами.
      За полное прохождение — 🪙 <b>+200</b>!
@@ -317,9 +320,15 @@
     if(t&&why)t.textContent=String(why).slice(0,220);
     if(f)f.classList.remove('hidden');
   };
-  /* любая ошибка — сразу на экран (иначе телефон молча зависает и баг неопознаваем) */
+  /* только РЕАЛЬНЫЕ ошибки скриптов выводят экран «Замок не открылся».
+     v12.5 fix: ошибки загрузки ресурсов (CDN/сеть) их не триггерят — раньше ЛЮБОЙ
+     недогруженный файл ронял игру на телефоне с надписью «Замок не открылся». */
   addEventListener('error',function(ev){
+    if(!ev||(!ev.message&&ev.target&&ev.target!==window))return; // ошибка ресурса (img/script/css) — не фатально
     window.__showFail('Ошибка: '+(ev.message||ev.type)+' ('+((ev.filename||'').split('/').pop()||'?')+':'+(ev.lineno||'?')+')');
+  });
+  addEventListener('unhandledrejection',function(ev){
+    window.__showFail('Ошибка: '+((ev.reason&&ev.reason.message)||ev.reason||'promise'));
   });
   var btn=document.getElementById('startBtn');
   if(btn)btn.addEventListener('click',function(){
@@ -328,10 +337,11 @@
       btn.textContent='ЗАГРУЗКА… ОДНА СЕКУНДА';
     }
   },true);
+  /* v12.5: на телефоне модуль грузится дольше — терпим 45 с, прогресс виден на экране */
   setTimeout(function(){
     if(window.__gameLoaded)return;
-    window.__showFail('Замок не пробудился за 20 секунд — проверь интернет и перезагрузи страницу.');
-  },20000);
+    window.__showFail('Замок не пробудился за 45 секунд — проверь интернет и перезагрузи страницу.');
+  },45000);
 })();
 </script>
 
@@ -373,6 +383,8 @@ let THREE=null;
 /* ПРОГРЕСС ЗАГРУЗКИ */
 const loadStep=(pct,txt)=>{ const b=document.getElementById('loadBar'),s=document.getElementById('loadTxt'); if(b)b.style.width=pct+'%'; if(s&&txt)s.textContent=txt; };
 const tick=()=>new Promise(r=>{ requestAnimationFrame(r); setTimeout(r,120); });
+/* v12.5: плавный поворот через кратчайшую дугу (никаких мгновенных рывков) */
+const lerpAngle=(a,b,t)=>{let d=(b-a)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return a+d*Math.min(1,t);};
 loadStep(8,'Грузим движок…');
 
 /* ================== БАЗА ================== */
@@ -4173,6 +4185,9 @@ function update(dt){
     if(en.kind==='kaver'){updateKaver(en,dt);continue;}
     const ex=en.mesh.position.x, ez=en.mesh.position.z;
     const dist=Math.hypot(player.pos.x-ex,player.pos.z-ez);
+    /* v12.5 PERF: очень далёкие враги (не боссы) пропускают AI и анимацию — телефон не лагает */
+    if(!en.boss&&dist>32)continue;
+    const animLite=!en.boss&&dist>18; // дальним режем мелкую анимацию
     /* призраки «чувствуют» игрока сквозь стены (ближе), остальные — только по прямой видимости */
     const isGhost=en.kind==='ghost';
     const seen=dist<(isGhost?11:13)&&(isGhost||los(ex,ez,player.pos.x,player.pos.z));
@@ -4456,7 +4471,8 @@ function update(dt){
     if(en.state==='chase'){
       const dx=(player.pos.x-ex)/dist, dz=(player.pos.z-ez)/dist;
       vx=dx*en.speed; vz=dz*en.speed;
-      en.mesh.rotation.y=Math.atan2(dx,dz);
+      /* v12.5: плавный доворот на игрока вместо мгновенного разворота */
+      en.mesh.rotation.y=lerpAngle(en.mesh.rotation.y,Math.atan2(dx,dz),dt*9);
       const ar=en.boss?2.8:(en.kind==='golem'?2.1:1.5); // v12.1: голем бьёт с большего радиуса
       if(dist<ar&&en.cd<=0&&player.pos.y<2.1&&!playerInSafe){
         en.cd=en.atkCd;
@@ -4516,7 +4532,7 @@ function update(dt){
     }
     if(Math.abs(en.mesh.position.x-oldx)<Math.abs(vx*dt)*0.5&&Math.abs(en.mesh.position.z-oldz)<Math.abs(vz*dt)*0.5&&en.state==='wander')en.wt=0;
     /* анимация шага рыцарей: ноги переставляются по реальной скорости */
-    const legs=en.mesh.userData&&en.mesh.userData.legs;
+    const legs=(!animLite)&&en.mesh.userData&&en.mesh.userData.legs;
     if(legs){
       const v=Math.hypot(en.mesh.position.x-oldx,en.mesh.position.z-oldz)/Math.max(dt,1e-4);
       /* v12.3: очень плавные ноги — скорость сглаживается (en.smSpd), без дёрганья */
@@ -4530,6 +4546,15 @@ function update(dt){
     }
     /* v11.1: АНИМАЦИИ ВРАГОВ */
     en.swing=Math.max(0,(en.swing||0)-dt*2.6);
+    /* v12.5: мягкое «дыхание» и микроколыхание у ближних врагов — модели живые даже в стойке */
+    if(!animLite){
+      if(en.sBX===undefined){en.sBX=en.mesh.scale.x;en.sBZ=en.mesh.scale.z;} // базовый масштаб (гарпия 1.5)
+      const br=Math.sin(en.t*2.2);
+      const sc=1+br*0.012;
+      en.mesh.scale.x=en.sBX*sc; en.mesh.scale.z=en.sBZ*sc;
+      if(!en.mesh.userData.legs&&!ENEMY_STATS[en.kind].ghost&&en.kind!=='harpy'&&en.kind!=='queen'&&en.kind!=='lich'&&en.kind!=='bat')
+        en.mesh.position.y=br*0.02;
+    }
     const ud=en.mesh.userData||{};
     if(en.kind==='knight'||en.kind==='bossKnight'){
       if(ud.arm&&ud.sword){
